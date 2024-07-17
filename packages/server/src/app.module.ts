@@ -9,28 +9,28 @@ import { PlanModule } from './domains/plan/plan.module';
 
 @Module({
   imports: [
-
-    TypegooseModule.forRootAsync({
-      useFactory: (config: ConfigService) => {
-        Logger.debug(
-          `connecting ${config.get('mongo_uri')}`,
-          TypegooseModule.name,
-        );
-        return {
-          uri: config.get('mongo_uri'),
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-          useCreateIndex: true,
-          useFindAndModify: false,
-        };
-      },
-      inject: [ConfigService],
-    }),
     PlaceModule,
     ConfigModule.forRoot({
       envFilePath: ['.env.local', '.env'],
+      ignoreEnvFile: false,
       cache: true,
       isGlobal: true,
+    }),
+    TypegooseModule.forRootAsync({
+      useFactory: (config: ConfigService) => {
+        Logger.debug(
+          `connecting ${config.get('MONGO_URI')}`,
+          TypegooseModule.name,
+        );
+        return {
+          uri: config.get('MONGO_URI'),
+          // useNewUrlParser: true,
+          // useUnifiedTopology: true,
+          // useCreateIndex: true,
+          // useFindAndModify: false,
+        };
+      },
+      inject: [ConfigService],
     }),
     PlanModule,
   ],

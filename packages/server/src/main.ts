@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './filters/http-exception/http-exception.filter';
 import { TransformInterceptor } from './interceptor/transform.interceptor';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -23,6 +24,7 @@ async function bootstrap() {
 
   const config = app.get(ConfigService);
 
+  Logger.debug('run at ', config.get('APP_PORT'));
   await app.listen(config.get('APP_PORT'));
 }
 bootstrap();
