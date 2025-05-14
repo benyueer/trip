@@ -8,6 +8,7 @@ import {
 } from 'react'
 import styles from './styles.module.less'
 import { useMapStore } from '../../store'
+import { Poi } from '../../pages/Trip/config'
 
 interface MapProps {
   showSearch?: boolean
@@ -27,7 +28,12 @@ export const AMap = forwardRef((_props: MapProps, ref: Ref<any>) => {
     const AMap = await window.AMapLoader.load({
       key: '352f9c4a914c78688cd57ad17f06807f',
       version: '2.0',
-      plugins: ['AMap.PlaceSearch', 'AMap.Driving', 'AMap.Marker', 'AMap.Geocoder'],
+      plugins: [
+        'AMap.PlaceSearch',
+        'AMap.Driving',
+        'AMap.Marker',
+        'AMap.Geocoder',
+      ],
     })
     const map = new window.AMap.Map('map_container', {
       // mapStyle: 'amap://styles/macaron',
@@ -81,14 +87,32 @@ export const AMap = forwardRef((_props: MapProps, ref: Ref<any>) => {
           mapRef.current.remove(marker)
         }
       },
-      addDrivingPath: (startLngLat, endLngLat, opts = {}) => {
-        drivingRef.current.search(startLngLat, endLngLat, opts, function (status, result) {
-          if (status === 'complete') {
-            console.log(result)
-          } else {
-            console.log('获取驾车数据失败：' + result)
-          }
+      addMarkers: (pois: Poi[]) => {
+        const markers = pois.map(({ position, name }) => {
+          const markerSpan = document.createElement('span')
+          markerSpan.className = styles.poiTextMarkerSpan
+          markerSpan.innerHTML = name
+          return new AMap.Marker({
+            position: new AMap.LngLat(position.lng, position.lat),
+            content: markerSpan,
+            offset: new AMap.Pixel(-10, -10),
+          })
         })
+        mapRef.current.add(markers)
+      },
+      addDrivingPath: (startLngLat, endLngLat, opts = {}) => {
+        drivingRef.current.search(
+          startLngLat,
+          endLngLat,
+          opts,
+          function (status, result) {
+            if (status === 'complete') {
+              console.log(result)
+            } else {
+              console.log('获取驾车数据失败：' + result)
+            }
+          },
+        )
       },
       getAddress: (lnglat) =>
         new Promise((resolve, reject) => {
