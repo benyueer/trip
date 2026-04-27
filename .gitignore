@@ -1,1 +1,6 @@
 deploy/data/*
+.DS_Store
+
+dist/*
+node_modules/*
+
