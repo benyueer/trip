@@ -24,6 +24,7 @@ export const items = pgTable('Item', {
   distance: text('distance'),
   path: jsonb('path'), // Store path as JSON [[lng, lat], ...]
   description: text('description'),
+  ticket: text('ticket'),  // 门票价格
   dayId: uuid('dayId')
     .notNull()
     .references(() => days.id, { onDelete: 'cascade' })

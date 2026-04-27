@@ -49,13 +49,14 @@ export class TripRepository {
           if (dayData.items && dayData.items.length > 0) {
             await tx.insert(items).values(
               dayData.items.map((item: any) => ({
-                id: item.id, // 使用前端传来的 ID
+                id: item.id,
                 type: item.type,
                 name: item.name,
                 lngLat: item.lngLat || [],
                 distance: item.distance,
                 path: item.path,
                 description: item.description,
+                ticket: item.ticket,
                 dayId: newDay.id
               }))
             )
@@ -105,6 +106,7 @@ export class TripRepository {
                 distance: item.distance,
                 path: item.path,
                 description: item.description,
+                ticket: item.ticket,
                 dayId: newDay.id
               }))
             )
