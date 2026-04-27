@@ -22,6 +22,7 @@ export const items = pgTable('Item', {
   name: text('name').notNull(),
   lngLat: real('lngLat').array().default([]).notNull(),
   distance: text('distance'),
+  duration: text('duration'),
   path: jsonb('path'), // Store path as JSON [[lng, lat], ...]
   description: text('description'),
   ticket: text('ticket'),  // 门票价格
