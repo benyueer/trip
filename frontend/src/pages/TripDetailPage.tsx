@@ -1,0 +1,64 @@
+import React, { useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useTripStore } from '../store'
+import MapContainer from '../components/MapContainer'
+import FloatingPanel from '../components/FloatingPanel'
+import PlaceModal from '../components/PlaceModal'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+
+const TripDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { fetchTripById, currentTrip, loading } = useTripStore()
+
+  useEffect(() => {
+    if (id) {
+      fetchTripById(id)
+    }
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className='w-screen h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-400'>
+        <Loader2 className='animate-spin mb-4' size={48} />
+        <p className='text-lg'>加载行程详情...</p>
+      </div>
+    )
+  }
+
+  if (!currentTrip) {
+    return (
+      <div className='w-screen h-screen flex flex-col items-center justify-center bg-gray-50'>
+        <p className='text-gray-500 mb-4'>未找到行程</p>
+        <button
+          onClick={() => navigate('/')}
+          className='text-blue-600 font-semibold flex items-center gap-2 hover:underline'
+        >
+          <ArrowLeft size={20} />
+          返回列表
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className='w-screen h-screen relative overflow-hidden bg-gray-50 font-sans'>
+      <button
+        onClick={() => navigate('/')}
+        className='absolute top-6 left-6 z-10 bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-white hover:bg-white transition-all active:scale-95 flex items-center justify-center text-gray-700'
+      >
+        <ArrowLeft size={24} />
+      </button>
+      
+      <MapContainer />
+      <FloatingPanel />
+      <PlaceModal />
+      
+      <div className='absolute top-6 left-24 z-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-white'>
+        <h1 className='text-lg font-bold text-gray-900'>{currentTrip.title}</h1>
+      </div>
+    </div>
+  )
+}
+
+export default TripDetailPage
