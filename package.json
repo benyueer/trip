@@ -1,0 +1,9 @@
+{
+  "name": "trip-monorepo",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "install:all": "pnpm install"
+  }
+}
