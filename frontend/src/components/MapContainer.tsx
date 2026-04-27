@@ -4,7 +4,7 @@ import { useTripStore, type Place, type Route } from '../store'
 
 // 配置高德地图安全密钥
 window._AMapSecurityConfig = {
-  securityJsCode: 'HIDDEN_AMAP_CODE',
+  securityJsCode: import.meta.env.VITE_AMAP_SECURITY_CODE,
 }
 
 export default function MapContainer() {
@@ -29,7 +29,7 @@ export default function MapContainer() {
     if (!mapContainer.current) return
     
     AMapLoader.load({
-      key: 'HIDDEN_AMAP_KEY',
+      key: import.meta.env.VITE_AMAP_KEY,
       version: '2.0',
       plugins: ['AMap.Marker', 'AMap.Polyline'],
     }).then((AMap) => {
