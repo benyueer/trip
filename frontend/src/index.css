@@ -40,3 +40,33 @@ html, body, #root {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   z-index: 20;
 }
+
+/* Routing Mode Marker Styles */
+.custom-text-marker.routing-available {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+  color: #6b7280;
+  animation: pulse 2s infinite;
+}
+
+.custom-text-marker.routing-start {
+  background-color: #10b981; /* green-500 */
+  color: white;
+  border-color: #059669;
+  transform: scale(1.1);
+  z-index: 30;
+}
+
+.custom-text-marker.routing-end {
+  background-color: #f43f5e; /* rose-500 */
+  color: white;
+  border-color: #e11d48;
+  transform: scale(1.1);
+  z-index: 30;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}

@@ -6,14 +6,17 @@ export default function PlaceModal() {
   const { editingItem, setEditingItem, addPlace, updatePlace, deleteItem } = useTripStore()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [ticket, setTicket] = useState('')
 
   useEffect(() => {
     if (editingItem?.type === 'edit' && editingItem.item) {
       setName(editingItem.item.name || '')
       setDescription(editingItem.item.description || '')
+      setTicket((editingItem.item as any).ticket || '')
     } else {
       setName('')
       setDescription('')
+      setTicket('')
     }
   }, [editingItem])
 
@@ -29,15 +32,17 @@ export default function PlaceModal() {
         type: 'place',
         name: name.trim(),
         description: description.trim(),
+        ticket: ticket.trim() || undefined,
         lngLat: editingItem.lngLat
       })
     } else if (editingItem.type === 'edit' && editingItem.item?.id) {
-      updatePlace(editingItem.dayIndex, editingItem.item.id, name.trim(), description.trim())
+      updatePlace(editingItem.dayIndex, editingItem.item.id, name.trim(), description.trim(), ticket.trim() || undefined)
     }
 
     setEditingItem(null)
     setName('')
     setDescription('')
+    setTicket('')
   }
 
   const handleDelete = () => {
@@ -108,6 +113,20 @@ export default function PlaceModal() {
                 rows={3}
                 className='w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 transition-all outline-none text-gray-900 font-medium placeholder:text-gray-300 resize-none'
               />
+            </div>
+
+            <div className='space-y-1.5'>
+              <label className='text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1'>门票价格</label>
+              <div className='relative'>
+                <span className='absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm'>¥</span>
+                <input
+                  type='text'
+                  value={ticket}
+                  onChange={(e) => setTicket(e.target.value)}
+                  placeholder='例如：80 或 免费'
+                  className='w-full pl-9 pr-5 py-3.5 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 transition-all outline-none text-gray-900 font-bold placeholder:text-gray-300'
+                />
+              </div>
             </div>
 
             <button

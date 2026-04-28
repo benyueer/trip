@@ -8,5 +8,6 @@ router.get('/:id', tripController.getTripById)
 router.post('/', tripController.createTrip)
 router.put('/:id', tripController.updateTrip)
 router.delete('/:id', tripController.deleteTrip)
+router.post('/:id/days/:dayIndex/routes', tripController.calculateAndAddRoute)
 
 export default router

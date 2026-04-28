@@ -17,7 +17,7 @@ const TripDetailPage: React.FC = () => {
     }
   }, [id])
 
-  if (loading) {
+  if (loading && currentTrip?.id !== id) {
     return (
       <div className='w-screen h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-400'>
         <Loader2 className='animate-spin mb-4' size={48} />
