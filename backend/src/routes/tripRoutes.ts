@@ -1,9 +1,13 @@
 import { Router } from 'express'
 import * as tripController from '../controllers/tripController'
+import { requireAuth } from '../auth/middleware'
 
 const router = Router()
 
+router.use(requireAuth)
+
 router.get('/', tripController.getAllTrips)
+router.get('/places', tripController.getAllPlaces)
 router.get('/:id', tripController.getTripById)
 router.post('/', tripController.createTrip)
 router.put('/:id', tripController.updateTrip)
