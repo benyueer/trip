@@ -11,5 +11,5 @@ export const DAY_COLORS = [
 
 // 根据 dayIndex 获取主题色（1-based）
 export function getDayColor(dayIndex: number) {
-  return DAY_COLORS[(dayIndex - 1) % DAY_COLORS.length]
+  return DAY_COLORS[(dayIndex) % DAY_COLORS.length]
 }

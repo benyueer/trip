@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AMapLoader from "@amap/amap-jsapi-loader";
-import { useTripStore, type Place, type Route } from "../store";
+import { useTripStore, type Place, type Route, type CachedPlace } from "../store";
 import { getDayColor } from "../utils/dayColors";
 
 // 配置高德地图安全密钥
@@ -21,7 +21,7 @@ export default function MapContainer() {
   const currentTrip = useTripStore((state) => state.currentTrip);
   const days = currentTrip?.days || [];
   const highlightedId = useTripStore((state) => state.highlightedId);
-  const { setHighlightedId, isEditMode, setEditingItem, activeDayIndex } =
+  const { setHighlightedId, isEditMode, setEditingItem, activeDayIndex, showAllPlaces, allPlacesCache } =
     useTripStore();
 
   // 初始化地图
@@ -37,6 +37,8 @@ export default function MapContainer() {
         "AMap.Driving",
         "AMap.Walking",
         "AMap.Riding",
+        "AMap.Geocoder",
+        "AMap.PlaceSearch",
       ],
     })
       .then((AMap) => {
@@ -66,18 +68,71 @@ export default function MapContainer() {
         setIsMapReady(true);
 
         // 绑定地图点击事件（用于新增地点）
-        map.current.on("click", (e: any) => {
-          // 只有在编辑模式下且非路线规划模式才触发
+        map.current.on("click", async (e: any) => {
           const {
             isEditMode: currentEditMode,
             isRouting,
             activeDayIndex: currentDay,
           } = useTripStore.getState();
+          
           if (currentEditMode && !isRouting) {
+            const lngLat: [number, number] = [e.lnglat.getLng(), e.lnglat.getLat()];
+            
+            // 默认初始数据
+            let name = "";
+            let address = "";
+            let phone = "";
+            let category = "";
+            let rating = "";
+
+            try {
+              // 1. 使用 Geocoder 获取地址
+              const geocoder = new AMap.Geocoder();
+              const geoResult = await new Promise<any>((resolve) => {
+                geocoder.getAddress(lngLat, (status: string, result: any) => {
+                  if (status === 'complete' && result.regeocode) resolve(result.regeocode);
+                  else resolve(null);
+                });
+              });
+
+              if (geoResult) {
+                address = geoResult.formattedAddress || "";
+              }
+
+              // 2. 使用 PlaceSearch 获取附近的 POI 信息（尝试精准匹配）
+              const placeSearch = new AMap.PlaceSearch({ pageSize: 1 });
+              const searchResult = await new Promise<any>((resolve) => {
+                placeSearch.searchNearBy("", lngLat, 50, (status: string, result: any) => {
+                  if (status === 'complete' && result.poiList && result.poiList.pois.length > 0) {
+                    resolve(result.poiList.pois[0]);
+                  } else {
+                    resolve(null);
+                  }
+                });
+              });
+
+              if (searchResult) {
+                name = searchResult.name || "";
+                address = searchResult.address || address; // 如果 POI 有更精准的地址则使用
+                phone = searchResult.tel || "";
+                category = searchResult.type || "";
+                rating = searchResult.biz_ext?.rating || "";
+              }
+            } catch (err) {
+              console.error("AMap Auto-fill failed:", err);
+            }
+
             setEditingItem({
               type: "add",
               dayIndex: currentDay,
-              lngLat: [e.lnglat.getLng(), e.lnglat.getLat()],
+              lngLat,
+              item: {
+                name,
+                address,
+                phone,
+                category,
+                rating,
+              }
             });
           }
         });
@@ -236,6 +291,40 @@ export default function MapContainer() {
       markersRef.current[place.id] = marker;
     });
 
+    // 所有地点标记（缓存中的其他行程地点）
+    if (showAllPlaces && allPlacesCache) {
+      // 当前行程的地点 ID 集合，避免重复标记
+      const currentPlaceIds = new Set(places.map(p => p.id));
+      allPlacesCache.forEach((cached: CachedPlace) => {
+        if (currentPlaceIds.has(cached.id)) return; // 已在当前行程中显示，跳过
+
+        const isHighlighted = highlightedId === cached.id;
+
+        const markerContent = isHighlighted
+          ? `<div style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px 4px 6px;background:#6366f1;color:#fff;border:none;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.2);transform:scale(1.12);z-index:100;">
+              <span style="font-size:10px;">📍</span>${cached.name}
+            </div>`
+          : `<div style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px 4px 6px;background:#f3f4f6;color:#9ca3af;border:1px solid #e5e7eb;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:all 0.2s;">
+              <span style="font-size:10px;opacity:0.6;">📍</span>${cached.name}
+            </div>`;
+
+        const marker = new AMap.Marker({
+          position: cached.lngLat,
+          content: markerContent,
+          offset: new AMap.Pixel(0, 0),
+          anchor: "bottom-center",
+          extData: { id: cached.id },
+        });
+
+        marker.on("click", () => {
+          setHighlightedId(cached.id);
+        });
+
+        marker.setMap(currentMap);
+        markersRef.current[cached.id] = marker;
+      });
+    }
+
     // 绘制路线（使用路线所在天的主题色）
     routes.forEach((route) => {
       const isHighlighted = highlightedId === route.id;
@@ -303,7 +392,7 @@ export default function MapContainer() {
       }
     });
 
-  }, [days, highlightedId, setHighlightedId, setEditingItem, isMapReady, zoom]);
+  }, [days, highlightedId, setHighlightedId, setEditingItem, isMapReady, zoom, showAllPlaces, allPlacesCache]);
 
   // 单独监听 highlightedId 的变化，仅在 ID 改变时执行一次聚焦
   const lastCenteredId = useRef<string | null>(null);
@@ -325,6 +414,13 @@ export default function MapContainer() {
     if (highlightedPlace) {
       currentMap.setZoomAndCenter(14, highlightedPlace.lngLat);
       lastCenteredId.current = highlightedId;
+    } else if (showAllPlaces && allPlacesCache) {
+      // 检查是否在所有地点缓存中
+      const cachedPlace = allPlacesCache.find((p) => p.id === highlightedId);
+      if (cachedPlace) {
+        currentMap.setZoomAndCenter(14, cachedPlace.lngLat);
+        lastCenteredId.current = highlightedId;
+      }
     } else {
       const highlightedRoute = routes.find((r) => r.id === highlightedId);
       if (highlightedRoute && polylinesRef.current[highlightedRoute.id]) {
@@ -332,7 +428,7 @@ export default function MapContainer() {
         lastCenteredId.current = highlightedId;
       }
     }
-  }, [highlightedId, isMapReady, days]);
+  }, [highlightedId, isMapReady, days, showAllPlaces, allPlacesCache]);
 
   return (
     <div

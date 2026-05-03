@@ -106,3 +106,5 @@ build
 
 # Vite
 *.local
+
+deploy/data

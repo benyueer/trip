@@ -18,8 +18,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useDroppable } from '@dnd-kit/core'
-import { useTripStore, type TripItem, type Place } from '../store'
-import { Plus, Trash2, MapPin, Navigation, GripVertical } from 'lucide-react'
+import { useTripStore, type TripItem, type Place, type CachedPlace } from '../store'
+import { Plus, Trash2, MapPin, Navigation, GripVertical, Star } from 'lucide-react'
 
 // ---- 单个可拖拽卡片 ----
 function SortableItemCard({
@@ -83,17 +83,39 @@ function SortableItemCard({
             >
               <MapPin size={18} />
             </div>
-            <div className='flex flex-col min-w-0'>
-              <span className={`font-bold text-sm ${isHighlight ? 'text-blue-900' : 'text-gray-800'}`}>{item.name}</span>
+            <div className='flex flex-col min-w-0 flex-1'>
+              <div className='flex items-center justify-between gap-2'>
+                <span className={`font-bold text-sm truncate ${isHighlight ? 'text-blue-900' : 'text-gray-800'}`}>{item.name}</span>
+                {item.type === 'place' && (item as any).rating && (
+                  <span className='flex items-center gap-0.5 text-[10px] font-bold text-amber-500 shrink-0'>
+                    <Star size={10} fill="currentColor" /> {(item as any).rating}
+                  </span>
+                )}
+              </div>
+              
+              <div className='flex flex-wrap gap-1 mt-1'>
+                {item.type === 'place' && (item as any).category && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${isHighlight ? 'bg-blue-200/50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {(item as any).category}
+                  </span>
+                )}
+                {(item as any).ticket && (
+                  <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md ${isHighlight ? 'bg-blue-200/50 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                    ¥{(item as any).ticket}
+                  </span>
+                )}
+              </div>
+
               {item.description && (
-                <p className={`text-xs mt-1 leading-relaxed ${isHighlight ? 'text-blue-700/70' : 'text-gray-500'}`}>{item.description}</p>
+                <p className={`text-xs mt-1 leading-relaxed line-clamp-2 ${isHighlight ? 'text-blue-700/70' : 'text-gray-500'}`}>{item.description}</p>
               )}
-              {(item as any).ticket && (
-                <span className={`inline-flex items-center gap-0.5 text-[10px] mt-1.5 font-bold px-2 py-0.5 rounded-full w-fit ${isHighlight ? 'bg-blue-100 text-blue-700' : 'bg-amber-50 text-amber-600 border border-amber-200'}`}>
-                  🎟 ¥{(item as any).ticket}
-                </span>
+
+              {item.type === 'place' && (item as any).address && (
+                <div className={`flex items-center gap-1 text-[10px] mt-1.5 ${isHighlight ? 'text-blue-600/60' : 'text-gray-400'}`}>
+                  <MapPin size={10} className="shrink-0" />
+                  <span className="truncate">{(item as any).address}</span>
+                </div>
               )}
-              <span className='text-[10px] text-gray-400 mt-1.5 font-medium uppercase tracking-wider'>地点</span>
             </div>
           </div>
         ) : (
@@ -223,6 +245,11 @@ export default function FloatingPanel() {
     deleteItem,
     reorderItems,
     moveItem,
+    showAllPlaces,
+    allPlacesCache,
+    allPlacesLoading,
+    fetchAllPlaces,
+    setShowAllPlaces,
   } = useTripStore()
 
   const [activeItem, setActiveItem] = useState<TripItem | null>(null)
@@ -242,6 +269,26 @@ export default function FloatingPanel() {
   const allPlaces = days.flatMap(d => d.items).filter(i => i.type === 'place') as Place[]
   const activeDay = days.find(d => d.dayIndex === activeDayIndex)
   const isDragging = activeItem !== null
+
+  // Fetch all places when toggled on
+  useEffect(() => {
+    if (showAllPlaces) {
+      fetchAllPlaces()
+    }
+  }, [showAllPlaces, fetchAllPlaces])
+
+  // Current trip's place IDs for dedup/priority
+  const currentTripPlaceIds = new Set(allPlaces.map(p => p.id))
+
+  // Sorted: current trip's places first, then others
+  const sortedAllPlaces: CachedPlace[] = allPlacesCache
+    ? [...allPlacesCache].sort((a, b) => {
+        const aIn = currentTripPlaceIds.has(a.id) ? 0 : 1
+        const bIn = currentTripPlaceIds.has(b.id) ? 0 : 1
+        if (aIn !== bIn) return aIn - bIn
+        return 0
+      })
+    : []
 
   function handleDragStart(event: DragStartEvent) {
     const draggedId = event.active.id as string
@@ -286,7 +333,7 @@ export default function FloatingPanel() {
     >
       <div className='absolute right-4 top-4 bottom-4 w-96 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 overflow-hidden flex flex-col z-10 transition-all duration-300'>
         {/* 头部 */}
-        <div className='p-5 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl z-20 flex justify-between items-center'>
+        <div className='p-5 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl z-20 flex justify-between items-start'>
           <div>
             <h1 className='text-2xl font-black bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent'>行程详情</h1>
             <div className='flex items-center gap-2 mt-1'>
@@ -300,6 +347,22 @@ export default function FloatingPanel() {
                 <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isEditMode ? 'left-4.5' : 'left-0.5'}`} />
               </button>
             </div>
+            {isEditMode && (
+              <div className='flex items-center gap-2 mt-2'>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${showAllPlaces ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}>
+                  所有地点
+                </span>
+                <button
+                  onClick={() => setShowAllPlaces(!showAllPlaces)}
+                  className={`w-8 h-4 rounded-full relative transition-colors ${showAllPlaces ? 'bg-indigo-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${showAllPlaces ? 'left-4.5' : 'left-0.5'}`} />
+                </button>
+                {allPlacesLoading && (
+                  <span className='text-[9px] text-gray-400 animate-pulse'>加载中...</span>
+                )}
+              </div>
+            )}
           </div>
           <button
             onClick={() => addDay()}
@@ -428,6 +491,64 @@ export default function FloatingPanel() {
                   />
                 ))}
               </SortableContext>
+
+              {/* 所有地点视图 */}
+              {showAllPlaces && sortedAllPlaces.length > 0 && (
+                <div className='mt-5 pt-4 border-t border-gray-200'>
+                  <h3 className='text-xs font-bold text-gray-500 uppercase tracking-wider mb-3'>所有地点（{sortedAllPlaces.length}）</h3>
+                  <div className='flex flex-col gap-2'>
+                    {sortedAllPlaces.map(place => {
+                      const inCurrentTrip = currentTripPlaceIds.has(place.id)
+                      return (
+                        <div
+                          key={place.id}
+                          onClick={() => setHighlightedId(place.id)}
+                          className={`
+                            group relative rounded-2xl cursor-pointer transition-all duration-300 border flex items-stretch
+                            ${highlightedId === place.id
+                              ? 'bg-blue-50/80 border-blue-200 shadow-lg ring-1 ring-blue-500/20'
+                              : inCurrentTrip
+                                ? 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-md'
+                                : 'bg-gray-100/60 border-gray-200/60 hover:border-gray-300'}
+                          `}
+                        >
+                          <div className='p-3 flex-1 min-w-0'>
+                            <div className='flex items-start gap-2.5'>
+                              <div className={`flex items-center justify-center w-8 h-8 rounded-xl text-sm font-bold transition-all shadow-sm shrink-0 ${
+                                inCurrentTrip ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500'
+                              }`}>
+                                <MapPin size={14} />
+                              </div>
+                              <div className='flex flex-col min-w-0 flex-1'>
+                                <div className='flex items-center justify-between gap-2'>
+                                  <span className={`text-xs font-bold truncate ${highlightedId === place.id ? 'text-blue-900' : inCurrentTrip ? 'text-gray-800' : 'text-gray-500'}`}>
+                                    {place.name}
+                                  </span>
+                                  {!inCurrentTrip && (
+                                    <span className='text-[8px] text-gray-400 truncate max-w-[100px] shrink-0' title={place.tripTitle}>
+                                      {place.tripTitle}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className='flex items-center gap-1.5 mt-0.5'>
+                                  {place.category && (
+                                    <span className='text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-gray-200/60 text-gray-500'>
+                                      {place.category}
+                                    </span>
+                                  )}
+                                  {place.address && (
+                                    <span className='text-[8px] text-gray-400 truncate'>{place.address}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

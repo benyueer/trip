@@ -1,0 +1,1202 @@
+[
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "南浔古镇",
+    "lngLat": [
+      120.439896,
+      30.88091
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "南浔镇东塘路古镇东大门",
+    "phone": "0572-3016999",
+    "openingHours": "夏令时:4月-10月:8:00-17:00,冬令时:11月-3月:8:00-16:30",
+    "rating": "4.9",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "太湖龙之梦度假区",
+    "lngLat": [
+      120.058412,
+      30.949779
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "图影大道888号",
+    "phone": "4006177878",
+    "openingHours": "周一至周日 00:00-24:00；6月营业时间 1、龙之梦动物世界营业时间:09:00-17:00，16:00停止检票。 2、醉美太湖演出时间:19:30-20:40，每晚演出（6月11-16日设备维护暂停演出） 3、国际大马戏演出时间:周一至周五:19:30-20:55，周二公休，每周六、6月15日:14:00-15:25、19:30-20:55，每周日:14:00-15:25 4、冰雪世界营业时间: 【周五、周六、法定节假日:09:30-22:30】 雪区滑雪:停止检票时间:20:00 冰雪小镇:停止检票时间:21:00 【周日-周四:09:30-20:30】 雪区滑雪:停止检票时间:18:30 冰雪小镇:停止检票时间:19:00 5、嬉水世界海神宫营业时间:10:00-18:00，16:30停止检票 以上时间，如有变动，以园区现场公布为准",
+    "rating": "4.7",
+    "category": "体育休闲服务",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "太湖演艺城",
+    "lngLat": [
+      120.076625,
+      30.952484
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "太湖图影旅游度假区",
+    "phone": "",
+    "openingHours": "周一至周日 09:30-22:00 最晚进入21:30",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "莫干山风景名胜区-剑池",
+    "lngLat": [
+      119.870954,
+      30.60492
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "莫干山镇孩儿巷30号莫干山风景区内",
+    "phone": "0572-8412345",
+    "openingHours": "周一至周日 08:00-24:00",
+    "rating": "4.4",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "南浔古镇东大门旅游驿站",
+    "lngLat": [
+      120.439815,
+      30.881053
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "便民路583-38号",
+    "phone": "0572-3016999",
+    "openingHours": "",
+    "rating": "3.9",
+    "category": "住宿服务",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "云上草原国际山地旅游度假区",
+    "lngLat": [
+      119.654302,
+      30.447119
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "山川乡山川村",
+    "phone": "0572-5050888;4007771117",
+    "openingHours": "平日:09:00-17:00；悬崖心跳乐园、高山草原、仙侠镇项目开放时间09:00-16:30；景区入园时间09:00-15:00(售票截止时间15:00)；徒步入园时间:09:00-13:00(如有变化以实时通知为主)；节假日5月1日-5日:8:00-21:00（仙侠镇夜游开启）；仙侠项目游玩截止时间:20:30；高山草原及悬崖心跳乐园项目游玩截止时间:17:00；游客中心售票截止时间:19:30；游客中心入园截止时间:20:00；徒步售票截止时间:14:00；徒步下山截止时间:16:00",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "莫干山风景名胜区",
+    "lngLat": [
+      119.866469,
+      30.607076
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "莫干山",
+    "phone": "0572-8412345",
+    "openingHours": "00:00-24:00；室内景点:08:30-16:30",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "莫干山国际旅游度假区",
+    "lngLat": [
+      119.882659,
+      30.586099
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "黄郛东路428号",
+    "phone": "0572-8052830",
+    "openingHours": "周一至周日 08:30-16:30",
+    "rating": "4.5",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "德清五四景区",
+    "lngLat": [
+      119.929326,
+      30.573008
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "莫干山镇五四村",
+    "phone": "0572-8025263",
+    "openingHours": "周一至周日 08:00-17:00；开放时间请咨询景区",
+    "rating": "4.2",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "安吉中南百草原景区",
+    "lngLat": [
+      119.656988,
+      30.671568
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "递铺街道三官村",
+    "phone": "0572-5217186;0572-5217806;12301;4008076176",
+    "openingHours": "周一至周日 08:00-17:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "新市古镇",
+    "lngLat": [
+      120.288467,
+      30.612044
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "胡家文路",
+    "phone": "0572-8450777",
+    "openingHours": "展馆08:30-16:30,古镇00:00-24:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "湖州太湖旅游度假区",
+    "lngLat": [
+      120.107811,
+      30.961354
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "太湖路6188号",
+    "phone": "0572-2159552;0572-2159559;0572-2159550",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "安吉余村景区",
+    "lngLat": [
+      119.604281,
+      30.522559
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "天荒坪镇余村",
+    "phone": "0572-5041011;0572-5043611;0572-5510565",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "下渚湖·湿地公园",
+    "lngLat": [
+      120.051336,
+      30.519303
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "三合乡下渚湖",
+    "phone": "0572-8484158",
+    "openingHours": "旺季08:00-16:30,淡季08:30-16:00,具体以当天开放情况为准",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "安吉Hello Kitty乐园",
+    "lngLat": [
+      119.740515,
+      30.621353
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "昌硕街道天使大道1号",
+    "phone": "4009778899",
+    "openingHours": "7月1日至8月31日:日场:10:00-17:00(16:00停止入园)；夜场:16:00-21:00(20:00停止入园)；1月1日至6月30日/9月1日-12月31日:10:00-17:00(16:00停止入园)",
+    "rating": "4.7",
+    "category": "体育休闲服务",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "城山沟景区",
+    "lngLat": [
+      119.93491,
+      30.812168
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "和平镇城山村平桥水库旁",
+    "phone": "0572-6970629;0572-6970669",
+    "openingHours": "周一至周日 08:30-16:30",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "浙江自然博物院安吉馆",
+    "lngLat": [
+      119.64652,
+      30.669318
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "递铺街道梅园路1号",
+    "phone": "0572-5022030;0572-5022217",
+    "openingHours": "周一至周二 全天关闭；周三至周日 09:00-17:00,节假日营业时间以官方通知为准",
+    "rating": "4.7",
+    "category": "科教文化服务",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "奇幻嘉乐比景区",
+    "lngLat": [
+      119.616664,
+      30.609585
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "灵峰旅游度假区递铺街道横山坞村旁",
+    "phone": "0572-5021333",
+    "openingHours": "01-01至05-14 周一 09:00-17:00 最晚进入16:30；01-01至05-14 周二至周五 09:30-20:00 最晚进入19:30；01-01至05-14 周六至周日 09:00-20:30 最晚进入20:00；每周一为演员休息日【如遇法定节假日顺延] 水乐园已闭园，ufo营业时间以景区为准游乐设施运行时间截止至17:00 以上信息仅供参考，具体以当日实际公示信息为准",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "安吉江南天池景区",
+    "lngLat": [
+      119.60147,
+      30.467139
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "天荒坪镇横路村",
+    "phone": "0572-5041858",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.5",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "湖州",
+    "name": "长谷洞天",
+    "lngLat": [
+      119.612354,
+      30.475713
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "S205省道天荒坪风景名胜区",
+    "phone": "0572-5041858;0572-5521215",
+    "openingHours": "周一至周日 08:30-16:30 最晚进入16:30",
+    "rating": "4.4",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "苏州园林",
+    "lngLat": [
+      120.629969,
+      31.324225
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "东北街178号拙政园内(东侧)",
+    "phone": "4009722963",
+    "openingHours": "周一至周日 09:00-16:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "拙政园",
+    "lngLat": [
+      120.629211,
+      31.324194
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "东北街178号",
+    "phone": "",
+    "openingHours": "周一至周日 08:00-17:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "留园",
+    "lngLat": [
+      120.59226,
+      31.315369
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "阊门外留园路338号",
+    "phone": "0512-962015",
+    "openingHours": "1月至2月,11月至12月 周一至周日 07:30-17:00 最晚进入16:30；3月至10月 周一至周日 07:30-17:30 最晚进入17:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "狮子林",
+    "lngLat": [
+      120.629095,
+      31.321068
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "园林路23号",
+    "phone": "0512-67773263",
+    "openingHours": "3月至10月 周一至周日 07:30-17:30 最晚进入17:00；1月至2月,11月至12月 周一至周日 07:30-17:00 最晚进入16:30",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "耦园",
+    "lngLat": [
+      120.63835,
+      31.31623
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "仓街小新桥巷6号",
+    "phone": "0512-67272717;0512-67272722",
+    "openingHours": "07:30-17:00，16:30停止售检票；2月15日-2月23日:07:30-17:30，17:00停止售检票",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "金鸡湖景区",
+    "lngLat": [
+      120.704824,
+      31.310263
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "苏州工业园区",
+    "phone": "4007558558",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "李公堤",
+    "lngLat": [
+      120.696997,
+      31.299976
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "李公堤南地铁站3西北口步行380米",
+    "phone": "0512-66966777",
+    "openingHours": "周一至周日 00:00-24:00；具体营业状态以当天开放情况为准",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "金水湾栈桥",
+    "lngLat": [
+      120.71559,
+      31.303103
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "金鸡湖景区(东南角)",
+    "phone": "0512-62659265",
+    "openingHours": "周一至周日 19:00-24:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "七里山塘景区",
+    "lngLat": [
+      120.602105,
+      31.317059
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "山塘街177号",
+    "phone": "0512-65314467",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "平江路",
+    "lngLat": [
+      120.634556,
+      31.313969
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "白塔东路65号",
+    "phone": "0512-69163907",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.9",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "周庄古镇",
+    "lngLat": [
+      120.85091,
+      31.114744
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "周庄镇全福路42号",
+    "phone": "4008282900",
+    "openingHours": "周一至周日 08:00-21:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "西园戒幢律寺",
+    "lngLat": [
+      120.587334,
+      31.314823
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "留园路西园弄18号",
+    "phone": "0512-65349545",
+    "openingHours": "01-01至01-28 周一至周日 07:30-17:30；02-03至12-31 周一至周日 07:30-17:30；01-29至02-01 周一至周日 06:00-17:30；02-02至02-02 周一至周日 05:00-17:30",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "苏州上方山国家森林公园",
+    "lngLat": [
+      120.583049,
+      31.245575
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "上方山行春桥吴越路57号",
+    "phone": "0512-68230800;0512-68231404",
+    "openingHours": "周一至周日 07:30-17:00 最晚进入16:30",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "寒山寺",
+    "lngLat": [
+      120.568391,
+      31.310469
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "枫桥路16号",
+    "phone": "0512-67236213",
+    "openingHours": "周一至周日 08:00-17:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "苏州市枫桥风景名胜区",
+    "lngLat": [
+      120.568304,
+      31.309475
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "枫桥路底(何山大桥东堍)",
+    "phone": "0512-65320288;0512-65575100",
+    "openingHours": "周一至周日 06:30-21:30",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "虎丘山风景区",
+    "lngLat": [
+      120.580016,
+      31.334584
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "虎丘山门内8号",
+    "phone": "0512-65323488",
+    "openingHours": "7:30-17:30,16:30停止售票,17:00停止检票",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "苏州同里古镇旅游区",
+    "lngLat": [
+      120.723765,
+      31.154999
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "中川南路1号",
+    "phone": "",
+    "openingHours": "全年 08:00-17:15开放；全年 17:30-20:45开放； 说明:景区内子景点17:00闭园。 3月18日-10月31日退思园夜场开放时间:17:30-20:45（具体以现场实际为准）",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "苏州市吴中太湖旅游区",
+    "lngLat": [
+      120.44673,
+      31.237324
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "东山镇湖滨路8号",
+    "phone": "0512-66555665",
+    "openingHours": "周一至周日 00:00-24:00；旅游区内景点开放时间按各景点为准",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "虞山国家森林公园",
+    "lngLat": [
+      120.709847,
+      31.665592
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "虞山镇北门大街21号",
+    "phone": "0512-52225000",
+    "openingHours": "周一至周日 08:00-16:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "苏州",
+    "name": "虞山风景区",
+    "lngLat": [
+      120.709741,
+      31.665715
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "虞山镇虞山南路88号",
+    "phone": "0512-52225000;0512-52229060",
+    "openingHours": "周一至周日 08:00-16:00",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "西塘古镇",
+    "lngLat": [
+      120.893704,
+      30.942938
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "西塘镇南苑路258号",
+    "phone": "0573-84567890;0573-84568003;0573-84561501",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "乌镇风景区",
+    "lngLat": [
+      120.486173,
+      30.748979
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "石佛南路18号",
+    "phone": "0573-88731088",
+    "openingHours": "周一至周日 07:00-22:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "乌镇西栅景区",
+    "lngLat": [
+      120.484263,
+      30.75027
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "石佛南路18号",
+    "phone": "0573-88731088",
+    "openingHours": "【西栅景区】09:00-22:00,【西栅夜景灯光】周至周四、周日17:25-22:00,周五至周六17:25-22:30,西栅景区木心美术馆闭馆科技馆闭馆东栅景区茅盾故居闭馆东栅景区木心故居纪念馆月15号闭馆，节假日营业时间以官方通知为准",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "乌镇东栅景区",
+    "lngLat": [
+      120.496901,
+      30.739693
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "乌镇子夜路",
+    "phone": "0573-88731088",
+    "openingHours": "周一至周日 07:00-17:30",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "乌村",
+    "lngLat": [
+      120.487751,
+      30.761353
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "石佛南路18号乌镇内",
+    "phone": "0573-88733009",
+    "openingHours": "10月8日-4月30日:09:00-17:00开放；5月1日-10月7日:09:00-17:30开放",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "草木本色染坊-染房",
+    "lngLat": [
+      120.486484,
+      30.749008
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "乌镇镇石佛南路18号乌镇风景区",
+    "phone": "0573-88731864",
+    "openingHours": "周一月至12月停止入场:12月开放时间:08:00-17:00",
+    "rating": "4.3",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "嘉兴南湖旅游区",
+    "lngLat": [
+      120.753137,
+      30.753681
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "南溪西路1号",
+    "phone": "0573-82532848;0573-82533437",
+    "openingHours": "周一至周日 08:00-17:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "南湖红船",
+    "lngLat": [
+      120.760741,
+      30.755014
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "海盐塘路188号嘉兴市南湖旅游区南湖湖心岛内",
+    "phone": "0573-82532848",
+    "openingHours": "",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "月河历史街区",
+    "lngLat": [
+      120.749976,
+      30.770826
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "新嘉街道建国北路22号",
+    "phone": "0573-82205588",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "勺园",
+    "lngLat": [
+      120.76203,
+      30.750163
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "南溪西路1号嘉兴市南湖旅游区内",
+    "phone": "0573-82511577",
+    "openingHours": "周一至周日 00:00-24:00",
+    "rating": "4.4",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "嘉兴市南湖旅游区-会景园",
+    "lngLat": [
+      120.765108,
+      30.751228
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "南溪路1号嘉兴南湖风景名胜区附近",
+    "phone": "0573-82532848",
+    "openingHours": "周一至周日 10:00-17:00",
+    "rating": "4.4",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "濮院时尚古镇",
+    "lngLat": [
+      120.632671,
+      30.683528
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "濮院镇濮川大街233号",
+    "phone": "0573-81880000;0573-88888678",
+    "openingHours": "周一至周日 09:00-22:00 最晚进入22:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "南北湖风景名胜区",
+    "lngLat": [
+      120.847395,
+      30.372508
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "澉浦镇331县道",
+    "phone": "0573-86513123",
+    "openingHours": "周一至周日 08:00-17:00",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "鹰窠顶",
+    "lngLat": [
+      120.85328,
+      30.365463
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "澉浦镇长青路18号南北湖景区内日月同辉亭傍边",
+    "phone": "",
+    "openingHours": "周一至周日 08:00-17:00",
+    "rating": "4.2",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "海宁皮革城",
+    "lngLat": [
+      120.667589,
+      30.505467
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "海州西路201号(皮革城地铁站D口步行350米)",
+    "phone": "0573-87217770;0573-87219920",
+    "openingHours": "周一至周日 09:00-17:00",
+    "rating": "4.8",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "海宁盐官旅游度假区",
+    "lngLat": [
+      120.586904,
+      30.402292
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "盐官镇春熙路80号",
+    "phone": "0573-87088888",
+    "openingHours": "周一至周日 00:00-24:00；1. 日场馆:城隍庙、陈阁老宅、五土庙、海神庙、金庸书院、孔庙学宫、王国维故居 营业时间:8:30-17:30。 2. 夜场馆:警察署、裕丰酱园、郑晓沧故居 营业时间:8:30-20:30。 3.主题乐园:小星球调 营业时间:10:00-20:30。",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "盐官潮乐之城国际旅游度假区",
+    "lngLat": [
+      120.543276,
+      30.404032
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "盐官镇拱辰路188号盐官潮乐之城国际旅游度假区",
+    "phone": "0573-87088888",
+    "openingHours": "5月1日-10月7日:08:30-22:30；10月8日-4月30日:08:30-22:00",
+    "rating": "4.6",
+    "category": "体育休闲服务",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "盐官古城",
+    "lngLat": [
+      120.540986,
+      30.409408
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "盐官镇拱辰路188号",
+    "phone": "0573-87088888",
+    "openingHours": "周一至周日 08:30-22:00",
+    "rating": "4.5",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "沈荡古镇",
+    "lngLat": [
+      120.823051,
+      30.572724
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "永庆西路与盐百线交叉口东南380米",
+    "phone": "",
+    "openingHours": "",
+    "rating": "4.6",
+    "category": "风景名胜",
+    "notes": ""
+  },
+  {
+    "type": "place",
+    "city": "嘉兴",
+    "name": "钟埭樱花小镇",
+    "lngLat": [
+      120.99151,
+      30.763053
+    ],
+    "distance": null,
+    "duration": null,
+    "path": null,
+    "description": null,
+    "ticket": null,
+    "address": "和盎路",
+    "phone": "",
+    "openingHours": "周一至周日 08:30-17:30",
+    "rating": "4.7",
+    "category": "风景名胜",
+    "notes": ""
+  }
+]

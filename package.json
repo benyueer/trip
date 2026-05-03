@@ -4,6 +4,7 @@
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",
     "dev:backend": "pnpm --filter backend dev",
+    "dev:all": "pnpm dev:frontend & pnpm dev:backend",
     "install:all": "pnpm install"
   }
 }
