@@ -1,21 +1,25 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTripStore } from '../store'
 import MapContainer from '../components/MapContainer'
 import FloatingPanel from '../components/FloatingPanel'
 import PlaceModal from '../components/PlaceModal'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import ShareModal from '../components/ShareModal'
+import { ArrowLeft, Loader2, Share2 } from 'lucide-react'
 
 const TripDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { fetchTripById, currentTrip, loading } = useTripStore()
+  const { fetchTripById, currentTrip, loading, user } = useTripStore()
+  const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
     if (id) {
       fetchTripById(id)
     }
   }, [id])
+
+  const isOwner = currentTrip && user && (currentTrip as any).ownerId === user.id
 
   if (loading && currentTrip?.id !== id) {
     return (
@@ -49,11 +53,25 @@ const TripDetailPage: React.FC = () => {
       >
         <ArrowLeft size={24} />
       </button>
-      
+
+      {isOwner && (
+        <button
+          onClick={() => setShowShareModal(true)}
+          className='absolute top-6 right-6 z-10 bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-white hover:bg-white transition-all active:scale-95 flex items-center justify-center text-gray-700'
+        >
+          <Share2 size={24} />
+        </button>
+      )}
+
       <MapContainer />
       <FloatingPanel />
       <PlaceModal />
-      
+      <ShareModal
+        tripId={id!}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
+
       <div className='absolute top-6 left-24 z-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-white'>
         <h1 className='text-lg font-bold text-gray-900'>{currentTrip.title}</h1>
       </div>

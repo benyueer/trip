@@ -3,15 +3,37 @@ import { useTripStore } from '../store'
 import { Plus, Trash2, Calendar, ChevronRight, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import LoginModal from '../components/LoginModal'
+import UserAvatar from '../components/UserAvatar'
 
 const PlanningListPage: React.FC = () => {
-  const { trips, fetchTrips, createTrip, deleteTrip, loading } = useTripStore()
+  const { trips, fetchTrips, createTrip, deleteTrip, loading, user, isAuthenticated, authChecked, fetchMe } = useTripStore()
   const [newTripTitle, setNewTripTitle] = useState('')
   const [isAdding, setIsAdding] = useState(false)
 
   useEffect(() => {
-    fetchTrips()
+    fetchMe()
   }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchTrips()
+    }
+  }, [isAuthenticated])
+
+  // Show loading while checking auth
+  if (!authChecked) {
+    return (
+      <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
+        <Loader2 className='animate-spin text-gray-400' size={40} />
+      </div>
+    )
+  }
+
+  // Show login modal if not authenticated
+  if (!isAuthenticated) {
+    return <LoginModal />
+  }
 
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,13 +51,16 @@ const PlanningListPage: React.FC = () => {
             <h1 className='text-4xl font-bold text-gray-900 mb-2'>行程规划</h1>
             <p className='text-gray-500'>探索世界，从一个完美的计划开始。</p>
           </div>
-          <button
-            onClick={() => setIsAdding(true)}
-            className='flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200 active:scale-95'
-          >
-            <Plus size={20} />
-            新建行程
-          </button>
+          <div className='flex items-center gap-4'>
+            <UserAvatar />
+            <button
+              onClick={() => setIsAdding(true)}
+              className='flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200 active:scale-95'
+            >
+              <Plus size={20} />
+              新建行程
+            </button>
+          </div>
         </header>
 
         <AnimatePresence>
