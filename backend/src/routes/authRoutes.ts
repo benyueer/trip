@@ -1,7 +1,32 @@
 import { Router } from 'express'
 import passport from '../auth/passport'
+import { userRepository } from '../repositories/UserRepository'
 
 const router = Router()
+
+// Dev login - auto login with a test user (only when no OAuth configured)
+const hasOAuth = process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID
+if (!hasOAuth) {
+  router.get('/dev-login', async (_req, res) => {
+    try {
+      const user = await userRepository.findOrCreateByProvider(
+        'dev', 'dev-user', {
+          email: 'dev@localhost',
+          name: 'Dev User',
+        }
+      )
+      _req.login(user, (err) => {
+        if (err) {
+          res.status(500).json({ error: 'Dev login failed' })
+          return
+        }
+        res.json(user)
+      })
+    } catch (err) {
+      res.status(500).json({ error: 'Dev login failed' })
+    }
+  })
+}
 
 // Get current user
 router.get('/me', (req, res) => {

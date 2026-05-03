@@ -1,10 +1,20 @@
 import React from 'react'
+import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
 
 const LoginModal: React.FC = () => {
   const handleLogin = (provider: 'google' | 'github') => {
     window.location.href = `${API_BASE}/auth/${provider}`
+  }
+
+  const handleDevLogin = async () => {
+    try {
+      await axios.get(`${API_BASE}/auth/dev-login`, { withCredentials: true })
+      window.location.reload()
+    } catch {
+      alert('开发模式登录失败，请确保后端已启动')
+    }
   }
 
   return (
@@ -36,6 +46,25 @@ const LoginModal: React.FC = () => {
             </svg>
             使用 GitHub 账号登录
           </button>
+
+          {import.meta.env.DEV && (
+            <>
+              <div className='relative my-2'>
+                <div className='absolute inset-0 flex items-center'>
+                  <div className='w-full border-t border-gray-200' />
+                </div>
+                <div className='relative flex justify-center text-sm'>
+                  <span className='bg-white px-3 text-gray-400'>开发模式</span>
+                </div>
+              </div>
+              <button
+                onClick={handleDevLogin}
+                className='w-full flex items-center justify-center gap-3 bg-green-50 hover:bg-green-100 text-green-700 font-semibold py-3.5 px-6 rounded-xl transition-all hover:shadow-md active:scale-[0.98]'
+              >
+                一键登录（开发模式）
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
