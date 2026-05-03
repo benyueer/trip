@@ -48,28 +48,32 @@ router.post('/logout', (req, res) => {
   })
 })
 
-// Google OAuth
-router.get('/google', passport.authenticate('google', {
-  scope: ['profile', 'email'],
-}))
+// Google OAuth (only when configured)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  router.get('/google', passport.authenticate('google', {
+    scope: ['profile', 'email'],
+  }))
 
-router.get('/google/callback',
-  passport.authenticate('google', { failureRedirect: '/' }),
-  (_req, res) => {
-    res.redirect(process.env.CLIENT_URL || '/')
-  }
-)
+  router.get('/google/callback',
+    passport.authenticate('google', { failureRedirect: '/' }),
+    (_req, res) => {
+      res.redirect(process.env.CLIENT_URL || '/')
+    }
+  )
+}
 
-// GitHub OAuth
-router.get('/github', passport.authenticate('github', {
-  scope: ['user:email'],
-}))
+// GitHub OAuth (only when configured)
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  router.get('/github', passport.authenticate('github', {
+    scope: ['user:email'],
+  }))
 
-router.get('/github/callback',
-  passport.authenticate('github', { failureRedirect: '/' }),
-  (_req, res) => {
-    res.redirect(process.env.CLIENT_URL || '/')
-  }
-)
+  router.get('/github/callback',
+    passport.authenticate('github', { failureRedirect: '/' }),
+    (_req, res) => {
+      res.redirect(process.env.CLIENT_URL || '/')
+    }
+  )
+}
 
 export default router
