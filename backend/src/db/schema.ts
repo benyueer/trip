@@ -1,6 +1,17 @@
 import { pgTable, text, timestamp, integer, jsonb, real, uuid } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
+export const users = pgTable('User', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  avatar: text('avatar'),
+  provider: text('provider').notNull(),
+  providerId: text('providerId').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull()
+})
+
 export const trips = pgTable('Trip', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: text('title').notNull(),
@@ -26,6 +37,12 @@ export const items = pgTable('Item', {
   path: jsonb('path'), // Store path as JSON [[lng, lat], ...]
   description: text('description'),
   ticket: text('ticket'),  // 门票价格
+  address: text('address'),
+  phone: text('phone'),
+  openingHours: text('openingHours'),
+  rating: text('rating'),
+  category: text('category'),
+  notes: text('notes'),
   dayId: uuid('dayId')
     .notNull()
     .references(() => days.id, { onDelete: 'cascade' })
