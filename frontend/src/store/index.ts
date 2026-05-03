@@ -11,6 +11,12 @@ export interface Place {
   name: string
   description?: string
   ticket?: string
+  address?: string
+  phone?: string
+  openingHours?: string
+  rating?: string
+  category?: string
+  notes?: string
   lngLat: [number, number]
 }
 
@@ -46,6 +52,29 @@ export interface EditingItem {
   lngLat?: [number, number]
 }
 
+// Place from all-trips cache (includes trip context)
+export interface CachedPlace extends Place {
+  tripId: string
+  tripTitle: string
+}
+
+export interface User {
+  id: string
+  email: string
+  name: string
+  avatar: string | null
+  provider: string
+}
+
+export interface Share {
+  id: string
+  tripId: string
+  userId: string
+  permission: string
+  createdAt: string
+  user: User
+}
+
 export interface TripState {
   trips: Trip[]
   currentTrip: Trip | null
@@ -54,7 +83,18 @@ export interface TripState {
   loading: boolean
   isEditMode: boolean
   editingItem: EditingItem | null
-  
+
+  // All-places cache
+  allPlacesCache: CachedPlace[] | null
+  allPlacesCacheTime: number
+  allPlacesLoading: boolean
+  showAllPlaces: boolean
+
+  // Auth
+  user: User | null
+  isAuthenticated: boolean
+  authChecked: boolean
+
   // Actions
   fetchTrips: () => Promise<void>
   fetchTripById: (id: string) => Promise<void>
@@ -63,19 +103,23 @@ export interface TripState {
   updateCurrentTrip: (data: Partial<Trip>) => Promise<void>
   addDay: () => Promise<void>
   deleteDay: (dayIndex: number) => Promise<void>
-  
+
   setHighlightedId: (id: string | null) => void
   setActiveDayIndex: (index: number) => void
   setIsEditMode: (isEditMode: boolean) => void
   setEditingItem: (item: EditingItem | null) => void
-  
+
   addPlace: (dayIndex: number, place: Place) => void
-  updatePlace: (dayIndex: number, placeId: string, name: string, description?: string, ticket?: string) => void
+  updatePlace: (dayIndex: number, placeId: string, data: Partial<Place>) => void
   deleteItem: (dayIndex: number, itemId: string) => void
   addRoute: (dayIndex: number, route: Route) => void
   calculateAndAddRoute: (dayIndex: number, startPlace: Place, endPlace: Place, mode: string) => Promise<void>
   reorderItems: (dayIndex: number, newItems: TripItem[]) => void
   moveItem: (fromDayIndex: number, toDayIndex: number, itemId: string) => void
+
+  // All-places actions
+  fetchAllPlaces: () => Promise<void>
+  setShowAllPlaces: (show: boolean) => void
 
   // Routing State
   isRouting: boolean
@@ -85,6 +129,9 @@ export interface TripState {
   cancelRouting: () => void
   setRoutingStart: (item: Place) => void
   setRoutingEnd: (item: Place) => void
+
+  fetchMe: () => Promise<void>
+  logout: () => Promise<void>
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -95,11 +142,19 @@ export const useTripStore = create<TripState>((set, get) => ({
   loading: false,
   isEditMode: false,
   editingItem: null,
+  allPlacesCache: null,
+  allPlacesCacheTime: 0,
+  allPlacesLoading: false,
+  showAllPlaces: false,
+
+  user: null,
+  isAuthenticated: false,
+  authChecked: false,
 
   fetchTrips: async () => {
     set({ loading: true })
     try {
-      const response = await axios.get(`${API_BASE_URL}/trips`)
+      const response = await axios.get(`${API_BASE_URL}/trips`, { withCredentials: true })
       set({ trips: response.data, loading: false })
     } catch (error) {
       console.error('Failed to fetch trips:', error)
@@ -110,7 +165,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   fetchTripById: async (id) => {
     set({ loading: true })
     try {
-      const response = await axios.get(`${API_BASE_URL}/trips/${id}`)
+      const response = await axios.get(`${API_BASE_URL}/trips/${id}`, { withCredentials: true })
       set({ currentTrip: response.data, loading: false, activeDayIndex: 1 })
     } catch (error) {
       console.error('Failed to fetch trip:', error)
@@ -120,7 +175,7 @@ export const useTripStore = create<TripState>((set, get) => ({
 
   createTrip: async (title) => {
     try {
-      await axios.post(`${API_BASE_URL}/trips`, { title })
+      await axios.post(`${API_BASE_URL}/trips`, { title }, { withCredentials: true })
       get().fetchTrips()
     } catch (error) {
       console.error('Failed to create trip:', error)
@@ -129,7 +184,7 @@ export const useTripStore = create<TripState>((set, get) => ({
 
   deleteTrip: async (id) => {
     try {
-      await axios.delete(`${API_BASE_URL}/trips/${id}`)
+      await axios.delete(`${API_BASE_URL}/trips/${id}`, { withCredentials: true })
       get().fetchTrips()
     } catch (error) {
       console.error('Failed to delete trip:', error)
@@ -144,8 +199,8 @@ export const useTripStore = create<TripState>((set, get) => ({
       const response = await axios.put(`${API_BASE_URL}/trips/${currentTrip.id}`, {
         ...currentTrip,
         ...data
-      })
-      set({ currentTrip: response.data })
+      }, { withCredentials: true })
+      set({ currentTrip: response.data, allPlacesCache: null, allPlacesCacheTime: 0 })
     } catch (error) {
       console.error('Failed to update trip:', error)
     }
@@ -174,17 +229,16 @@ export const useTripStore = create<TripState>((set, get) => ({
     get().updateCurrentTrip({ days: newDays })
   },
 
-  updatePlace: (dayIndex, placeId, name, description, ticket) => {
+  updatePlace: (dayIndex, placeId, data) => {
     const { currentTrip } = get()
     if (!currentTrip) return
-
     const newDays = currentTrip.days.map(day => {
       if (day.dayIndex === dayIndex) {
         return {
           ...day,
           items: day.items.map(item => {
             if (item.id === placeId) {
-              return { ...item, name, description, ticket }
+              return { ...item, ...data }
             }
             return item
           })
@@ -192,7 +246,6 @@ export const useTripStore = create<TripState>((set, get) => ({
       }
       return day
     })
-    
     get().updateCurrentTrip({ days: newDays })
   },
 
@@ -228,7 +281,7 @@ export const useTripStore = create<TripState>((set, get) => ({
         endLngLat: endPlace.lngLat,
         mode,
         name
-      })
+      }, { withCredentials: true })
       
       set({ currentTrip: response.data, loading: false })
       get().cancelRouting()
@@ -328,6 +381,26 @@ export const useTripStore = create<TripState>((set, get) => ({
     await get().updateCurrentTrip({ days: newDays })
   },
 
+  // All-places actions
+  setShowAllPlaces: (show) => set({ showAllPlaces: show }),
+
+  fetchAllPlaces: async () => {
+    const { allPlacesCache, allPlacesCacheTime } = get()
+    const now = Date.now()
+    // 5-minute cache TTL
+    if (allPlacesCache && allPlacesCacheTime && now - allPlacesCacheTime < 5 * 60 * 1000) {
+      return
+    }
+    set({ allPlacesLoading: true })
+    try {
+      const response = await axios.get(`${API_BASE_URL}/trips/places`, { withCredentials: true })
+      set({ allPlacesCache: response.data, allPlacesCacheTime: now, allPlacesLoading: false })
+    } catch (error) {
+      console.error('Failed to fetch all places:', error)
+      set({ allPlacesLoading: false })
+    }
+  },
+
   // Routing implementation
   isRouting: false,
   routingStartItem: null,
@@ -347,6 +420,28 @@ export const useTripStore = create<TripState>((set, get) => ({
   }),
 
   setRoutingStart: (item) => set({ routingStartItem: item }),
-  
-  setRoutingEnd: (item) => set({ routingEndItem: item })
+
+  setRoutingEnd: (item) => set({ routingEndItem: item }),
+
+  fetchMe: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL.replace('/api', '')}/auth/me`, {
+        withCredentials: true,
+      })
+      set({ user: response.data, isAuthenticated: true, authChecked: true })
+    } catch {
+      set({ user: null, isAuthenticated: false, authChecked: true })
+    }
+  },
+
+  logout: async () => {
+    try {
+      await axios.post(`${API_BASE_URL.replace('/api', '')}/auth/logout`, {}, {
+        withCredentials: true,
+      })
+    } catch {
+      // Ignore errors on logout
+    }
+    set({ user: null, isAuthenticated: false, currentTrip: null, trips: [] })
+  },
 }))
