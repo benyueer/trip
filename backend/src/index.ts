@@ -31,7 +31,7 @@ app.use(express.json({ limit: '50mb' }))
 app.use(session({
   store: new PgSession({
     pool,
-    tableName: 'Session',
+    tableName: 'session',
   }),
   secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
   resave: false,
