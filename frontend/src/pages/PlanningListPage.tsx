@@ -7,7 +7,7 @@ import LoginModal from '../components/LoginModal'
 import UserAvatar from '../components/UserAvatar'
 
 const PlanningListPage: React.FC = () => {
-  const { trips, fetchTrips, createTrip, deleteTrip, loading, user, isAuthenticated, authChecked, fetchMe } = useTripStore()
+  const { trips, fetchTrips, createTrip, deleteTrip, loading, isAuthenticated, authChecked, fetchMe } = useTripStore()
   const [newTripTitle, setNewTripTitle] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const navigate = useNavigate()

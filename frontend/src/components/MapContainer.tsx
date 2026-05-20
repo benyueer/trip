@@ -3,6 +3,12 @@ import AMapLoader from "@amap/amap-jsapi-loader";
 import { useTripStore, type Place, type Route, type CachedPlace } from "../store";
 import { getDayColor } from "../utils/dayColors";
 
+declare global {
+  interface Window {
+    _AMapSecurityConfig: { securityJsCode: string };
+  }
+}
+
 // 配置高德地图安全密钥
 window._AMapSecurityConfig = {
   securityJsCode: import.meta.env.VITE_AMAP_SECURITY_CODE,
@@ -21,7 +27,7 @@ export default function MapContainer() {
   const currentTrip = useTripStore((state) => state.currentTrip);
   const days = currentTrip?.days || [];
   const highlightedId = useTripStore((state) => state.highlightedId);
-  const { setHighlightedId, isEditMode, setEditingItem, activeDayIndex, showAllPlaces, allPlacesCache } =
+  const { setHighlightedId, setEditingItem, showAllPlaces, allPlacesCache } =
     useTripStore();
   const agentSuggestedPlaces = useTripStore((state) => state.agentSuggestedPlaces);
   const agentSuggestedHoverId = useRef<string | null>(null);
@@ -448,7 +454,7 @@ export default function MapContainer() {
 
     if (!agentSuggestedPlaces || agentSuggestedPlaces.length === 0) return;
 
-    agentSuggestedPlaces.forEach((place, index) => {
+    agentSuggestedPlaces.forEach((place: { name: string; lngLat: [number, number]; description?: string; category?: string; rating?: string; address?: string; ticket?: string }, index: number) => {
       const markerId = `agent-suggested-${index}`;
       const isHovered = agentSuggestedHoverId.current === markerId;
 

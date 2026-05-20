@@ -1,4 +1,4 @@
-import { streamText, CoreMessage } from 'ai'
+import { streamText, ModelMessage, stepCountIs } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { agentRepository } from '../repositories/AgentRepository'
 import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan } from './agentTools'
@@ -14,7 +14,6 @@ function getLLM() {
   const openai = createOpenAI({
     apiKey,
     baseURL,
-    compatibility: 'compatible',
   })
   return openai(model)
 }
@@ -56,7 +55,7 @@ export async function streamChatWithAgent(
 
   // 2. Load short-term memory (conversation history)
   const history = await agentRepository.findMessagesBySession(sessionId)
-  const messages: CoreMessage[] = history
+  const messages: ModelMessage[] = history
     .reverse()
     .slice(-20)
     .map(m => ({
@@ -97,27 +96,27 @@ export async function streamChatWithAgent(
       createTripPlan,
       modifyTripPlan,
     },
-    maxSteps: 5,
+    stopWhen: stepCountIs(5),
     toolChoice: 'auto',
     onFinish: async ({ text, toolResults }) => {
       // Extract metadata from tool results
       const metadata: StreamMetadata = {}
       for (const toolResult of toolResults) {
         if (toolResult.toolName === 'queryLocalPlaces' || toolResult.toolName === 'webSearch') {
-          const res = toolResult.result as any
+          const res = toolResult.output as any
           if (res.places) {
             metadata.suggestedPlaces = res.places
           }
         }
         if (toolResult.toolName === 'createTripPlan') {
-          const res = toolResult.result as any
+          const res = toolResult.output as any
           if (res.tripId) {
             metadata.tripId = res.tripId
             metadata.tripTitle = res.title
           }
         }
         if (toolResult.toolName === 'modifyTripPlan') {
-          const res = toolResult.result as any
+          const res = toolResult.output as any
           if (res.tripId) {
             metadata.modifiedTripId = res.tripId
           }

@@ -75,6 +75,45 @@ export interface Share {
   user: User
 }
 
+export interface AgentSession {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AgentMessage {
+  id: string
+  sessionId: string
+  role: 'user' | 'assistant'
+  content: string
+  metadata?: {
+    suggestedPlaces?: Array<{
+      name: string
+      lngLat: [number, number]
+      description?: string
+      category?: string
+      rating?: string
+      address?: string
+      ticket?: string
+    }>
+    tripId?: string
+    tripTitle?: string
+    modifiedTripId?: string
+    blocked?: boolean
+    reason?: string
+  }
+  createdAt: string
+}
+
+export interface UserMemory {
+  id: string
+  content: string
+  category: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface TripState {
   trips: Trip[]
   currentTrip: Trip | null
@@ -132,6 +171,24 @@ export interface TripState {
 
   fetchMe: () => Promise<void>
   logout: () => Promise<void>
+
+  // Agent
+  agentSessions: AgentSession[]
+  activeAgentSessionId: string | null
+  agentMessages: AgentMessage[]
+  agentSuggestedPlaces: NonNullable<AgentMessage['metadata']>['suggestedPlaces'] | null
+  agentLoading: boolean
+  isAgentPanelOpen: boolean
+
+  // Agent actions
+  fetchAgentSessions: () => Promise<void>
+  createAgentSession: (title?: string) => Promise<string>
+  deleteAgentSession: (id: string) => Promise<void>
+  setActiveAgentSession: (id: string) => Promise<void>
+  sendAgentMessage: (content: string, currentTripId?: string) => Promise<void>
+  setAgentPanelOpen: (open: boolean) => void
+  clearSuggestedPlaces: () => void
+  addSuggestedPlaceToTrip: (place: { name: string; lngLat: [number, number]; description?: string; category?: string; address?: string; rating?: string; ticket?: string }, dayIndex?: number) => void
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -238,7 +295,7 @@ export const useTripStore = create<TripState>((set, get) => ({
           ...day,
           items: day.items.map(item => {
             if (item.id === placeId) {
-              return { ...item, ...data }
+              return { ...item, ...data } as TripItem
             }
             return item
           })
@@ -443,5 +500,223 @@ export const useTripStore = create<TripState>((set, get) => ({
       // Ignore errors on logout
     }
     set({ user: null, isAuthenticated: false, currentTrip: null, trips: [] })
+  },
+
+  // Agent state
+  agentSessions: [],
+  activeAgentSessionId: null,
+  agentMessages: [],
+  agentSuggestedPlaces: null,
+  agentLoading: false,
+  isAgentPanelOpen: false,
+
+  fetchAgentSessions: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/agent/sessions`, { withCredentials: true })
+      set({ agentSessions: response.data })
+    } catch (error) {
+      console.error('Failed to fetch agent sessions:', error)
+    }
+  },
+
+  createAgentSession: async (title) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/agent/sessions`, { title }, { withCredentials: true })
+      const session = response.data
+      set(state => ({ agentSessions: [session, ...state.agentSessions] }))
+      return session.id
+    } catch (error) {
+      console.error('Failed to create agent session:', error)
+      return ''
+    }
+  },
+
+  deleteAgentSession: async (id) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/agent/sessions/${id}`, { withCredentials: true })
+      set(state => ({
+        agentSessions: state.agentSessions.filter(s => s.id !== id),
+        activeAgentSessionId: state.activeAgentSessionId === id ? null : state.activeAgentSessionId,
+        agentMessages: state.activeAgentSessionId === id ? [] : state.agentMessages,
+      }))
+    } catch (error) {
+      console.error('Failed to delete agent session:', error)
+    }
+  },
+
+  setActiveAgentSession: async (id) => {
+    set({ activeAgentSessionId: id, agentMessages: [], agentSuggestedPlaces: null })
+    try {
+      const response = await axios.get(`${API_BASE_URL}/agent/sessions/${id}/messages`, { withCredentials: true })
+      set({ agentMessages: response.data })
+    } catch (error) {
+      console.error('Failed to fetch agent messages:', error)
+    }
+  },
+
+  sendAgentMessage: async (content, currentTripId) => {
+    const { activeAgentSessionId } = get()
+    if (!activeAgentSessionId) return
+
+    // Optimistically add user message
+    const tempUserMsg: AgentMessage = {
+      id: `temp-${Date.now()}`,
+      sessionId: activeAgentSessionId,
+      role: 'user',
+      content,
+      createdAt: new Date().toISOString(),
+    }
+    const assistantId = `assistant-${Date.now()}`
+    const placeholderAssistant: AgentMessage = {
+      id: assistantId,
+      sessionId: activeAgentSessionId,
+      role: 'assistant',
+      content: '',
+      createdAt: new Date().toISOString(),
+    }
+
+    set(state => ({
+      agentMessages: [...state.agentMessages, tempUserMsg, placeholderAssistant],
+      agentLoading: true,
+    }))
+
+    try {
+      // Use fetch for SSE streaming (axios doesn't support streaming well)
+      const response = await fetch(`${API_BASE_URL}/agent/sessions/${activeAgentSessionId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content, currentTripId }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      // Check if it's a JSON response (blocked by intent) or SSE stream
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        // Blocked message (harmful/off_topic) — comes back as plain JSON
+        const data = await response.json()
+        set(state => ({
+          agentMessages: state.agentMessages.map(m =>
+            m.id === assistantId
+              ? { ...m, content: data.content, metadata: data.metadata }
+              : m
+          ),
+          agentLoading: false,
+        }))
+        return
+      }
+
+      // Text stream — read tokens incrementally
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let fullText = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        fullText += chunk
+
+        // Update the streaming message in real-time
+        set(state => ({
+          agentMessages: state.agentMessages.map(m =>
+            m.id === assistantId
+              ? { ...m, content: fullText }
+              : m
+          ),
+        }))
+      }
+
+      // After stream completes, fetch the saved message to get metadata
+      try {
+        const msgsResponse = await axios.get(
+          `${API_BASE_URL}/agent/sessions/${activeAgentSessionId}/messages`,
+          { withCredentials: true }
+        )
+        const msgs = msgsResponse.data
+        // Find the last assistant message (should be the one we just streamed)
+        const lastAssistant = [...msgs].reverse().find((m: any) => m.role === 'assistant')
+        const metadata = lastAssistant?.metadata || {}
+
+        set(state => ({
+          agentMessages: state.agentMessages.map(m =>
+            m.id === assistantId
+              ? { ...m, content: fullText, metadata }
+              : m
+          ),
+          agentLoading: false,
+          agentSuggestedPlaces: metadata.suggestedPlaces || state.agentSuggestedPlaces,
+        }))
+
+        // If a trip was created, navigate to it
+        if (metadata.tripId) {
+          window.dispatchEvent(new CustomEvent('agent:navigateTrip', {
+            detail: { tripId: metadata.tripId }
+          }))
+        }
+        // If a trip was modified, refresh it
+        if (metadata.modifiedTripId) {
+          get().fetchTripById(metadata.modifiedTripId)
+        }
+      } catch {
+        // Metadata fetch failed, just use what we have
+        set(state => ({
+          agentMessages: state.agentMessages.map(m =>
+            m.id === assistantId ? { ...m, content: fullText } : m
+          ),
+          agentLoading: false,
+        }))
+      }
+    } catch (error) {
+      console.error('Failed to send agent message:', error)
+      set(state => ({
+        agentMessages: state.agentMessages.map(m =>
+          m.id === assistantId
+            ? { ...m, content: '抱歉，处理消息时出现错误，请重试。' }
+            : m
+        ),
+        agentLoading: false,
+      }))
+    }
+  },
+
+  setAgentPanelOpen: (open) => set({ isAgentPanelOpen: open }),
+  clearSuggestedPlaces: () => set({ agentSuggestedPlaces: null }),
+
+  addSuggestedPlaceToTrip: (place, dayIndex) => {
+    const { currentTrip, activeDayIndex } = get()
+    if (!currentTrip) {
+      alert('请先打开一个行程')
+      return
+    }
+
+    const targetDay = dayIndex ?? activeDayIndex
+    const newDays = [...currentTrip.days]
+    let day = newDays.find(d => d.dayIndex === targetDay)
+    if (!day) {
+      day = { dayIndex: targetDay, items: [] }
+      newDays.push(day)
+    }
+
+    day.items.push({
+      id: crypto.randomUUID(),
+      type: 'place',
+      name: place.name,
+      lngLat: place.lngLat,
+      description: place.description || '',
+      category: place.category || '',
+      address: place.address || '',
+      rating: place.rating || '',
+      ticket: place.ticket || '',
+      openingHours: '',
+      phone: '',
+      notes: '',
+    })
+
+    get().updateCurrentTrip({ days: newDays })
   },
 }))

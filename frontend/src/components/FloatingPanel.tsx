@@ -26,7 +26,7 @@ function SortableItemCard({
   item,
   isHighlight,
   isEditMode,
-  activeDayIndex,
+  activeDayIndex: _activeDayIndex,
   dayColor,
   onHighlight,
   onDelete,

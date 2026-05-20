@@ -8,7 +8,7 @@ const router = Router({ mergeParams: true })
 // List shares for a trip
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const shares = await shareRepository.findByTripId(id)
     res.json(shares)
   } catch (error) {
@@ -20,7 +20,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 // Add a share (invite user)
 router.post('/', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const { userId, permission } = req.body
 
     // Verify the requester is the trip owner
@@ -48,7 +48,8 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 // Remove a share
 router.delete('/:userId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { id, userId } = req.params
+    const id = req.params.id as string
+    const userId = req.params.userId as string
 
     // Verify the requester is the trip owner
     const trip = await tripRepository.findById(id)

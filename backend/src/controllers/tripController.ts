@@ -13,14 +13,15 @@ export const getAllTrips = async (req: Request, res: Response) => {
 
 export const getTripById = async (req: Request, res: Response) => {
   try {
-    const trip = await tripRepository.findById(req.params.id)
+    const id = req.params.id as string
+    const trip = await tripRepository.findById(id)
     if (!trip) {
       res.status(404).json({ error: 'Trip not found' })
       return
     }
 
     // Check access
-    const hasAccess = await tripRepository.canUserAccess(req.params.id, req.user!.id)
+    const hasAccess = await tripRepository.canUserAccess(id, req.user!.id)
     if (!hasAccess) {
       res.status(403).json({ error: 'Access denied' })
       return
@@ -45,13 +46,14 @@ export const createTrip = async (req: Request, res: Response) => {
 
 export const updateTrip = async (req: Request, res: Response) => {
   try {
-    const isOwner = await tripRepository.isOwner(req.params.id, req.user!.id)
+    const id = req.params.id as string
+    const isOwner = await tripRepository.isOwner(id, req.user!.id)
     if (!isOwner) {
       res.status(403).json({ error: 'Only the owner can update this trip' })
       return
     }
 
-    const updatedTrip = await tripRepository.update(req.params.id, req.body)
+    const updatedTrip = await tripRepository.update(id, req.body)
     res.json(updatedTrip)
   } catch (error) {
     console.error('Error updating trip:', error)
@@ -61,13 +63,14 @@ export const updateTrip = async (req: Request, res: Response) => {
 
 export const deleteTrip = async (req: Request, res: Response) => {
   try {
-    const isOwner = await tripRepository.isOwner(req.params.id, req.user!.id)
+    const id = req.params.id as string
+    const isOwner = await tripRepository.isOwner(id, req.user!.id)
     if (!isOwner) {
       res.status(403).json({ error: 'Only the owner can delete this trip' })
       return
     }
 
-    await tripRepository.delete(req.params.id)
+    await tripRepository.delete(id)
     res.status(204).send()
   } catch (error) {
     console.error('Error deleting trip:', error)
@@ -103,7 +106,8 @@ export const getAllPlaces = async (req: Request, res: Response) => {
 
 export const calculateAndAddRoute = async (req: Request, res: Response) => {
   try {
-    const { id, dayIndex } = req.params
+    const id = req.params.id as string
+    const dayIndex = req.params.dayIndex as string
     const { startLngLat, endLngLat, mode, name, routeId } = req.body
 
     if (!startLngLat || !endLngLat || !mode) {
@@ -204,7 +208,7 @@ export const calculateAndAddRoute = async (req: Request, res: Response) => {
       trip.days.push(day as any)
     }
 
-    day.items.push(newRoute as any)
+    day!.items.push(newRoute as any)
 
     const updatedTrip = await tripRepository.update(id, trip)
     res.json(updatedTrip)
