@@ -19,6 +19,18 @@ const TripDetailPage: React.FC = () => {
     }
   }, [id])
 
+  useEffect(() => {
+    const handleNavigate = (e: CustomEvent) => {
+      const { tripId } = e.detail
+      if (tripId) {
+        navigate(`/trip/${tripId}`)
+      }
+    }
+
+    window.addEventListener('agent:navigateTrip', handleNavigate as EventListener)
+    return () => window.removeEventListener('agent:navigateTrip', handleNavigate as EventListener)
+  }, [navigate])
+
   const isOwner = currentTrip && user && (currentTrip as any).ownerId === user.id
 
   if (loading && currentTrip?.id !== id) {

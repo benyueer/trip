@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useTripStore } from '../store'
 import { Plus, Trash2, Calendar, ChevronRight, Loader2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import LoginModal from '../components/LoginModal'
 import UserAvatar from '../components/UserAvatar'
@@ -10,6 +10,7 @@ const PlanningListPage: React.FC = () => {
   const { trips, fetchTrips, createTrip, deleteTrip, loading, user, isAuthenticated, authChecked, fetchMe } = useTripStore()
   const [newTripTitle, setNewTripTitle] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchMe()
@@ -20,6 +21,18 @@ const PlanningListPage: React.FC = () => {
       fetchTrips()
     }
   }, [isAuthenticated])
+
+  useEffect(() => {
+    const handleNavigate = (e: CustomEvent) => {
+      const { tripId } = e.detail
+      if (tripId) {
+        navigate(`/trip/${tripId}`)
+      }
+    }
+
+    window.addEventListener('agent:navigateTrip', handleNavigate as EventListener)
+    return () => window.removeEventListener('agent:navigateTrip', handleNavigate as EventListener)
+  }, [navigate])
 
   // Show loading while checking auth
   if (!authChecked) {
