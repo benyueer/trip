@@ -10,6 +10,7 @@ import authRoutes from './routes/authRoutes'
 import shareRoutes from './routes/shareRoutes'
 import userRoutes from './routes/userRoutes'
 import agentRoutes from './routes/agentRoutes'
+import mcpRoutes from './routes/mcpRoutes'
 
 dotenv.config()
 
@@ -55,6 +56,7 @@ app.use('/api/trips', tripRoutes)
 app.use('/api/trips/:id/shares', shareRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/agent', agentRoutes)
+app.use('/api/mcp', mcpRoutes)
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
