@@ -23,6 +23,8 @@ export default function MapContainer() {
   const highlightedId = useTripStore((state) => state.highlightedId);
   const { setHighlightedId, isEditMode, setEditingItem, activeDayIndex, showAllPlaces, allPlacesCache } =
     useTripStore();
+  const agentSuggestedPlaces = useTripStore((state) => state.agentSuggestedPlaces);
+  const agentSuggestedHoverId = useRef<string | null>(null);
 
   // 初始化地图
   useEffect(() => {
@@ -430,19 +432,127 @@ export default function MapContainer() {
     }
   }, [highlightedId, isMapReady, days, showAllPlaces, allPlacesCache]);
 
+  // Agent suggested place markers (orange)
+  useEffect(() => {
+    if (!isMapReady || !map.current || !AMapInstance.current) return;
+    const AMap = AMapInstance.current;
+    const currentMap = map.current;
+
+    // Clean up previous agent markers
+    Object.entries(markersRef.current).forEach(([key, m]) => {
+      if (key.startsWith("agent-suggested-")) {
+        m.setMap(null);
+        delete markersRef.current[key];
+      }
+    });
+
+    if (!agentSuggestedPlaces || agentSuggestedPlaces.length === 0) return;
+
+    agentSuggestedPlaces.forEach((place, index) => {
+      const markerId = `agent-suggested-${index}`;
+      const isHovered = agentSuggestedHoverId.current === markerId;
+
+      const size = isHovered ? 36 : 28;
+      const markerContent = `
+        <div style="
+          width:${size}px; height:${size}px;
+          background: linear-gradient(135deg, #f97316, #ea580c);
+          border: 3px solid #fff;
+          border-radius: 50%;
+          box-shadow: 0 3px 10px rgba(249,115,22,0.4);
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.2s ease;
+          cursor: pointer;
+          ${isHovered ? "transform: scale(1.2) translateY(-4px); box-shadow: 0 6px 20px rgba(249,115,22,0.5);" : ""}
+        ">
+          <span style="color:#fff; font-size:${isHovered ? 16 : 13}px; font-weight:700;">${index + 1}</span>
+        </div>
+      `;
+
+      const marker = new AMap.Marker({
+        position: place.lngLat,
+        content: markerContent,
+        offset: new AMap.Pixel(0, 0),
+        anchor: "bottom-center",
+        zIndex: 200,
+        extData: { id: markerId, placeIndex: index },
+      });
+
+      marker.on("click", () => {
+        currentMap.setZoomAndCenter(14, place.lngLat);
+        window.dispatchEvent(
+          new CustomEvent("agent:focusCard", { detail: { index } })
+        );
+      });
+
+      marker.setMap(currentMap);
+      markersRef.current[markerId] = marker;
+    });
+  }, [agentSuggestedPlaces, isMapReady, zoom]);
+
   // 监听 agent focusPlace 事件，聚焦地图到指定位置
   useEffect(() => {
     const handleFocusPlace = (e: CustomEvent) => {
-      const { lngLat } = e.detail
+      const { lngLat } = e.detail;
       if (map.current && lngLat) {
-        map.current.setCenter(lngLat)
-        map.current.setZoom(14)
+        map.current.setCenter(lngLat);
+        map.current.setZoom(14);
       }
-    }
+    };
 
-    window.addEventListener('agent:focusPlace', handleFocusPlace as EventListener)
-    return () => window.removeEventListener('agent:focusPlace', handleFocusPlace as EventListener)
-  }, [])
+    window.addEventListener(
+      "agent:focusPlace",
+      handleFocusPlace as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "agent:focusPlace",
+        handleFocusPlace as EventListener
+      );
+  }, []);
+
+  // 监听 agent:cardHover 事件，高亮对应建议地点标记
+  useEffect(() => {
+    if (!isMapReady || !map.current) return;
+
+    const handleCardHover = (e: CustomEvent) => {
+      const { index, isHover } = e.detail;
+      const markerId = `agent-suggested-${index}`;
+      agentSuggestedHoverId.current = isHover ? markerId : null;
+
+      const marker = markersRef.current[markerId];
+      if (marker && agentSuggestedPlaces) {
+        const place = agentSuggestedPlaces[index];
+        if (!place) return;
+        const size = isHover ? 36 : 28;
+        marker.setContent(`
+          <div style="
+            width:${size}px; height:${size}px;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 ${isHover ? 6 : 3}px ${isHover ? 20 : 10}px rgba(249,115,22,${isHover ? 0.5 : 0.4});
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            ${isHover ? "transform: scale(1.2) translateY(-4px);" : ""}
+          ">
+            <span style="color:#fff; font-size:${isHover ? 16 : 13}px; font-weight:700;">${index + 1}</span>
+          </div>
+        `);
+      }
+    };
+
+    window.addEventListener(
+      "agent:cardHover",
+      handleCardHover as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "agent:cardHover",
+        handleCardHover as EventListener
+      );
+  }, [isMapReady, agentSuggestedPlaces]);
 
   return (
     <div
