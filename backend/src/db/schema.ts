@@ -63,10 +63,46 @@ export const tripShares = pgTable('TripShare', {
   uniqueIndex('trip_share_unique').on(t.tripId, t.userId),
 ])
 
+// --- Agent Tables ---
+
+export const agentSessions = pgTable('AgentSession', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+})
+
+export const agentMessages = pgTable('AgentMessage', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('sessionId')
+    .notNull()
+    .references(() => agentSessions.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(), // 'user' | 'assistant'
+  content: text('content').notNull(),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+})
+
+export const userMemories = pgTable('UserMemory', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  category: text('category').notNull().default('preference'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+})
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedTrips: many(trips),
   sharedTrips: many(tripShares),
+  agentSessions: many(agentSessions),
+  memories: many(userMemories),
 }))
 
 export const tripsRelations = relations(trips, ({ one, many }) => ({
@@ -100,6 +136,28 @@ export const tripSharesRelations = relations(tripShares, ({ one }) => ({
   }),
   user: one(users, {
     fields: [tripShares.userId],
+    references: [users.id],
+  }),
+}))
+
+export const agentSessionsRelations = relations(agentSessions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [agentSessions.userId],
+    references: [users.id],
+  }),
+  messages: many(agentMessages),
+}))
+
+export const agentMessagesRelations = relations(agentMessages, ({ one }) => ({
+  session: one(agentSessions, {
+    fields: [agentMessages.sessionId],
+    references: [agentSessions.id],
+  }),
+}))
+
+export const userMemoriesRelations = relations(userMemories, ({ one }) => ({
+  user: one(users, {
+    fields: [userMemories.userId],
     references: [users.id],
   }),
 }))
