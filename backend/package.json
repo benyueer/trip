@@ -17,6 +17,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.64",
+    "ai": "^6.0.185",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -26,7 +28,8 @@
     "passport": "^0.7.0",
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/connect-pg-simple": "^7.0.3",
