@@ -5,12 +5,12 @@ import MapContainer from '../components/MapContainer'
 import FloatingPanel from '../components/FloatingPanel'
 import PlaceModal from '../components/PlaceModal'
 import ShareModal from '../components/ShareModal'
-import { ArrowLeft, Loader2, Share2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Share2, Bot } from 'lucide-react'
 
 const TripDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { fetchTripById, currentTrip, loading, user } = useTripStore()
+  const { fetchTripById, currentTrip, loading, user, setAgentPanelOpen, isAgentPanelOpen } = useTripStore()
   const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
@@ -75,6 +75,14 @@ const TripDetailPage: React.FC = () => {
       <div className='absolute top-6 left-24 z-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-white'>
         <h1 className='text-lg font-bold text-gray-900'>{currentTrip.title}</h1>
       </div>
+
+      <button
+        onClick={() => setAgentPanelOpen(!isAgentPanelOpen)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group z-30 animate-pulse"
+        style={{ animationDuration: '3s' }}
+      >
+        <Bot className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
+      </button>
     </div>
   )
 }

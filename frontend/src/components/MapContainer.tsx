@@ -430,6 +430,20 @@ export default function MapContainer() {
     }
   }, [highlightedId, isMapReady, days, showAllPlaces, allPlacesCache]);
 
+  // 监听 agent focusPlace 事件，聚焦地图到指定位置
+  useEffect(() => {
+    const handleFocusPlace = (e: CustomEvent) => {
+      const { lngLat } = e.detail
+      if (map.current && lngLat) {
+        map.current.setCenter(lngLat)
+        map.current.setZoom(14)
+      }
+    }
+
+    window.addEventListener('agent:focusPlace', handleFocusPlace as EventListener)
+    return () => window.removeEventListener('agent:focusPlace', handleFocusPlace as EventListener)
+  }, [])
+
   return (
     <div
       ref={mapContainer}
