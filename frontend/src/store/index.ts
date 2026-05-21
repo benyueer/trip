@@ -201,6 +201,11 @@ export interface TripState {
   agentSuggestedPlaces: NonNullable<AgentMessage['metadata']>['suggestedPlaces'] | null
   agentLoading: boolean
   isAgentPanelOpen: boolean
+  agentPlanRoutes: Array<{
+    distance: string
+    duration: string
+    path: [number, number][]
+  }> | null
 
   // Agent actions
   fetchAgentSessions: () => Promise<void>
@@ -211,6 +216,7 @@ export interface TripState {
   setAgentPanelOpen: (open: boolean) => void
   clearSuggestedPlaces: () => void
   addSuggestedPlaceToTrip: (place: { name: string; lngLat: [number, number]; description?: string; category?: string; address?: string; rating?: string; ticket?: string }, dayIndex?: number) => void
+  setAgentPlanRoutes: (routes: Array<{ distance: string; duration: string; path: [number, number][] }> | null) => void
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -531,6 +537,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   agentSuggestedPlaces: null,
   agentLoading: false,
   isAgentPanelOpen: false,
+  agentPlanRoutes: null,
 
   fetchAgentSessions: async () => {
     try {
@@ -708,6 +715,7 @@ export const useTripStore = create<TripState>((set, get) => ({
 
   setAgentPanelOpen: (open) => set({ isAgentPanelOpen: open }),
   clearSuggestedPlaces: () => set({ agentSuggestedPlaces: null }),
+  setAgentPlanRoutes: (routes) => set({ agentPlanRoutes: routes }),
 
   addSuggestedPlaceToTrip: (place, dayIndex) => {
     const { currentTrip, activeDayIndex } = get()

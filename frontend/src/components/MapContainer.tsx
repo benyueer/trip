@@ -30,6 +30,7 @@ export default function MapContainer() {
   const { setHighlightedId, setEditingItem, showAllPlaces, allPlacesCache } =
     useTripStore();
   const agentSuggestedPlaces = useTripStore((state) => state.agentSuggestedPlaces);
+  const agentPlanRoutes = useTripStore((state) => state.agentPlanRoutes);
   const agentSuggestedHoverId = useRef<string | null>(null);
 
   // 初始化地图
@@ -438,6 +439,65 @@ export default function MapContainer() {
     }
   }, [highlightedId, isMapReady, days, showAllPlaces, allPlacesCache]);
 
+  // Agent plan routes (indigo polylines for day plan preview)
+  useEffect(() => {
+    if (!isMapReady || !map.current || !AMapInstance.current) return;
+    const AMap = AMapInstance.current;
+    const currentMap = map.current;
+
+    // Clean up previous plan route polylines
+    Object.entries(polylinesRef.current).forEach(([key, p]) => {
+      if (key.startsWith("plan-route-")) {
+        p.setMap(null);
+        delete polylinesRef.current[key];
+      }
+    });
+
+    if (!agentPlanRoutes || agentPlanRoutes.length === 0) return;
+
+    agentPlanRoutes.forEach((route, index) => {
+      if (!route.path || route.path.length === 0) return;
+
+      const polylineId = `plan-route-${index}`;
+      const polyline = new AMap.Polyline({
+        path: route.path,
+        strokeColor: "#6366f1",
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+        strokeStyle: "solid",
+        lineJoin: "round",
+        lineCap: "round",
+        cursor: "pointer",
+        extData: { id: polylineId },
+      });
+
+      polyline.setMap(currentMap);
+      polylinesRef.current[polylineId] = polyline;
+
+      // Add route label at midpoint
+      if (route.path.length > 0) {
+        const midIndex = Math.floor(route.path.length / 2);
+        const midPoint = route.path[midIndex];
+
+        const routeMarker = new AMap.Marker({
+          position: midPoint,
+          content: `
+            <div style="white-space:nowrap;padding:2px 8px;background:rgba(99,102,241,0.9);color:#fff;border-radius:8px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(99,102,241,0.3);">
+              <span>🚗</span>
+              <span>${route.distance}${route.duration ? " · " + route.duration : ""}</span>
+            </div>
+          `,
+          offset: new AMap.Pixel(0, -10),
+          anchor: "center",
+          zIndex: 300,
+        });
+
+        routeMarker.setMap(currentMap);
+        polylinesRef.current[`${polylineId}-label`] = routeMarker;
+      }
+    });
+  }, [agentPlanRoutes, isMapReady]);
+
   // Agent suggested place markers (orange)
   useEffect(() => {
     if (!isMapReady || !map.current || !AMapInstance.current) return;
@@ -515,6 +575,25 @@ export default function MapContainer() {
         "agent:focusPlace",
         handleFocusPlace as EventListener
       );
+  }, []);
+
+  // 监听 agent:fitPlanView 事件
+  useEffect(() => {
+    const handleFitPlanView = (e: CustomEvent) => {
+      const { lngLats } = e.detail;
+      if (map.current && AMapInstance.current && lngLats && lngLats.length > 0) {
+        const AMap = AMapInstance.current;
+        const bounds = new AMap.Bounds();
+        for (const [lng, lat] of lngLats) {
+          bounds.extend(new AMap.LngLat(lng, lat));
+        }
+        map.current.setBounds(bounds, false, [60, 60, 60, 60]);
+      }
+    };
+
+    window.addEventListener("agent:fitPlanView", handleFitPlanView as EventListener);
+    return () =>
+      window.removeEventListener("agent:fitPlanView", handleFitPlanView as EventListener);
   }, []);
 
   // 监听 agent:cardHover 事件，高亮对应建议地点标记
