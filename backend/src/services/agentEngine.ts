@@ -179,33 +179,36 @@ export async function streamChatWithAgent(
           ? reasoning.map((r: any) => r.text || JSON.stringify(r)).join('\n')
           : String(reasoning)
       }
+
+      logger.info('agent', `Processing ${toolResults.length} tool results`)
+
       for (const toolResult of toolResults) {
-        if (toolResult.toolName === 'queryLocalPlaces' || toolResult.toolName === 'webSearch') {
-          const res = toolResult.output as any
-          if (res.places) {
-            metadata.suggestedPlaces = res.places
-          }
+        const res = toolResult.output as any
+        const toolName = toolResult.toolName
+
+        logger.info('agent', `Tool: ${toolName}`, { output: JSON.stringify(res).slice(0, 300) })
+
+        // Suggested places from search tools
+        if (res?.places) {
+          metadata.suggestedPlaces = res.places
         }
-        if (toolResult.toolName === 'createTripPlan') {
-          const res = toolResult.output as any
-          if (res.tripId) {
-            metadata.tripId = res.tripId
-            metadata.tripTitle = res.title
-            logger.agent.tripCreated(res.tripId, res.title)
-          }
+
+        // Trip creation
+        if (toolName === 'createTripPlan' && res?.tripId) {
+          metadata.tripId = res.tripId
+          metadata.tripTitle = res.title
+          logger.agent.tripCreated(res.tripId, res.title)
         }
-        if (toolResult.toolName === 'modifyTripPlan') {
-          const res = toolResult.output as any
-          if (res.tripId) {
-            metadata.modifiedTripId = res.tripId
-            logger.agent.tripModified(res.tripId, res.action)
-          }
+
+        // Trip modification — check both toolName and generic tripId presence
+        if (res?.tripId && (toolName === 'modifyTripPlan' || res?.action)) {
+          metadata.modifiedTripId = res.tripId
+          logger.agent.tripModified(res.tripId, res.action || 'unknown')
         }
-        if (toolResult.toolName === 'saveUserMemory') {
-          const res = toolResult.output as any
-          if (res.saved) {
-            logger.agent.memory(res.action, String((toolResult as any).input?.content || ''))
-          }
+
+        // Memory save
+        if (toolName === 'saveUserMemory' && res?.saved) {
+          logger.agent.memory(res.action, String((toolResult as any).input?.content || ''))
         }
       }
 
