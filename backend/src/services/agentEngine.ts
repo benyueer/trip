@@ -1,8 +1,10 @@
-import { streamText, ModelMessage, stepCountIs } from 'ai'
+import { streamText, ModelMessage, stepCountIs, tool } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { agentRepository } from '../repositories/AgentRepository'
 import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan, toolResultStore } from './agentTools'
 import { logger } from './logger'
+import { getMCPTools, callMCPTool } from './mcpClient'
+import { z } from 'zod'
 
 function getLLM() {
   const apiKey = process.env.LLM_API_KEY
@@ -70,7 +72,8 @@ const SYSTEM_PROMPT = `你是一个专业的旅行规划助手。你的职责是
 - 当用户要求规划行程时，使用 createTripPlan 工具创建
 - 当用户要求修改行程时，使用 modifyTripPlan 工具修改
 - 回复要简洁、有用，适合旅行场景
-- 如果用户的问题与旅行无关，礼貌地告知你只能帮助旅行规划相关的问题`
+- 如果用户的问题与旅行无关，礼貌地告知你只能帮助旅行规划相关的问题
+- 你还可以使用高德地图 MCP 工具进行路线规划和地点搜索（工具名以 mcp_ 为前缀）`
 
 export interface StreamMetadata {
   suggestedPlaces?: any[]
@@ -159,6 +162,33 @@ export async function streamChatWithAgent(
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   toolResultStore.reset(runId)
 
+  // Build MCP tools dynamically from connected servers
+  const mcpToolsMap: Record<string, any> = {}
+  const mcpTools = getMCPTools()
+  for (const mcpTool of mcpTools) {
+    const toolName = `mcp_${mcpTool.name}`
+    const properties = mcpTool.inputSchema?.properties || {}
+    const required = new Set(mcpTool.inputSchema?.required || [])
+    const zodShape: Record<string, any> = {}
+    for (const [key, prop] of Object.entries(properties) as [string, any][]) {
+      let field: any = prop.type === 'string' ? z.string() :
+                       prop.type === 'number' ? z.number() :
+                       prop.type === 'boolean' ? z.boolean() :
+                       z.any()
+      if (prop.description) field = field.describe(prop.description)
+      if (!required.has(key)) field = field.optional()
+      zodShape[key] = field
+    }
+    mcpToolsMap[toolName] = tool({
+      description: mcpTool.description,
+      inputSchema: z.object(zodShape),
+      execute: async (args: any) => {
+        logger.agent.toolCall(toolName, args)
+        return await callMCPTool(mcpTool.name, args)
+      },
+    })
+  }
+
   // 6. Run agent with streaming + tools
   const result = streamText({
     model: getLLM(),
@@ -170,6 +200,7 @@ export async function streamChatWithAgent(
       saveUserMemory,
       createTripPlan,
       modifyTripPlan,
+      ...mcpToolsMap,
     },
     stopWhen: stepCountIs(5),
     toolChoice: 'auto',

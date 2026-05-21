@@ -11,6 +11,7 @@ import shareRoutes from './routes/shareRoutes'
 import userRoutes from './routes/userRoutes'
 import agentRoutes from './routes/agentRoutes'
 import mcpRoutes from './routes/mcpRoutes'
+import { connectMCPServers } from './services/mcpClient'
 import { logger } from './services/logger'
 
 dotenv.config()
@@ -70,6 +71,9 @@ app.use('/api/trips/:id/shares', shareRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/agent', agentRoutes)
 app.use('/api/mcp', mcpRoutes)
+
+// Connect MCP servers (non-blocking)
+connectMCPServers().catch(err => console.error('MCP connection error:', err))
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
