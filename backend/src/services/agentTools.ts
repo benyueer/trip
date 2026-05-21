@@ -2,6 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { agentRepository } from '../repositories/AgentRepository'
 import { tripRepository } from '../repositories/TripRepository'
+import { logger } from './logger'
 
 // Shared store for tool execution results — tools write here, engine reads after stream
 // Uses a runId to isolate results between concurrent message processing
@@ -41,6 +42,7 @@ export const queryLocalPlaces = tool({
     limit: z.number().optional().default(10).describe('Max number of results'),
   }),
   execute: async ({ query, limit }) => {
+    logger.agent.toolCall('queryLocalPlaces', { query, limit })
     const allPlaces = await tripRepository.findAllPlacesForUser('')
     const filtered = allPlaces
       .filter(p =>
@@ -60,6 +62,9 @@ export const queryLocalPlaces = tool({
         ticket: p.ticket,
         openingHours: p.openingHours,
       }))
+    logger.info('tools', `queryLocalPlaces("${query}") → ${filtered.length} results`, {
+      names: filtered.map(p => p.name),
+    })
     toolResultStore.suggestedPlaces = filtered
     return { places: filtered, count: filtered.length }
   },
@@ -72,6 +77,7 @@ export const webSearch = tool({
     query: z.string().describe('Search query, e.g. "新疆草原推荐"'),
   }),
   execute: async ({ query }) => {
+    logger.agent.toolCall('webSearch', { query })
     try {
       const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`
       const response = await fetch(url, {
@@ -106,11 +112,15 @@ export const webSearch = tool({
         })
       }
 
+      logger.info('tools', `webSearch("${query}") → ${results.length} results`, {
+        titles: results.map(r => r.title),
+      })
       return {
         answer: results.length > 0 ? `Found ${results.length} results for "${query}"` : 'No results found',
         results,
       }
     } catch (error) {
+      logger.error('tools', `webSearch("${query}") failed`, { error: String(error) })
       return { answer: 'Search temporarily unavailable', results: [] }
     }
   },
@@ -125,6 +135,7 @@ export const saveUserMemory = tool({
     category: z.enum(['preference', 'habit', 'experience']).describe('Type of memory'),
   }),
   execute: async ({ userId, content, category }) => {
+    logger.agent.toolCall('saveUserMemory', { content, category })
     // Check for similar existing memories to avoid duplicates
     const existing = await agentRepository.findMemoriesByUser(userId)
     const similar = existing.find(m =>
@@ -132,9 +143,11 @@ export const saveUserMemory = tool({
     )
     if (similar) {
       await agentRepository.updateMemory(similar.id, content)
+      logger.agent.memory('updated', content)
       return { saved: true, action: 'updated', memoryId: similar.id }
     }
     const memory = await agentRepository.createMemory(userId, content, category)
+    logger.agent.memory('created', content)
     return { saved: true, action: 'created', memoryId: memory.id }
   },
 })
@@ -162,6 +175,7 @@ export const createTripPlan = tool({
     })).describe('Array of day plans, each with ordered places'),
   }),
   execute: async ({ userId, title, description, days }) => {
+    logger.agent.toolCall('createTripPlan', { title, description, days: days.length })
     const tripData = {
       title,
       description: description || '',
@@ -183,6 +197,7 @@ export const createTripPlan = tool({
       })),
     }
     const trip = await tripRepository.create(tripData, userId)
+    logger.agent.tripCreated(trip!.id, trip!.title)
     toolResultStore.createdTripId = trip!.id
     toolResultStore.createdTripTitle = trip!.title
     return { tripId: trip!.id, title: trip!.title, days: trip!.days.length }
@@ -206,6 +221,7 @@ export const modifyTripPlan = tool({
     }).optional().describe('New place data (required for add/replace)'),
   }),
   execute: async ({ tripId, action, dayIndex, placeName, newPlace }) => {
+    logger.agent.toolCall('modifyTripPlan', { tripId: tripId.slice(0, 8), action, dayIndex, placeName })
     const trip = await tripRepository.findById(tripId)
     if (!trip) return { error: 'Trip not found' }
 
@@ -247,6 +263,7 @@ export const modifyTripPlan = tool({
     }
 
     const updatedTrip = await tripRepository.update(tripId, trip)
+    logger.agent.tripModified(updatedTrip!.id, `${action} "${placeName}" in day${dayIndex}`)
     toolResultStore.modifiedTripId = updatedTrip!.id
     toolResultStore.modifiedAction = action
     return {
