@@ -2,6 +2,7 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { agentRepository } from '../repositories/AgentRepository'
 import { tripRepository } from '../repositories/TripRepository'
+import { callMCPTool } from './mcpClient'
 import { logger } from './logger'
 
 // Shared store for tool execution results — tools write here, engine reads after stream
@@ -124,21 +125,6 @@ export const webSearch = tool({
         snippet: (r.content || '').slice(0, 200),
         url: r.url || '',
       }))
-      const places = results.map((r: any) => ({
-        name: r.title,
-        lngLat: [0, 0] as [number, number],
-        description: r.snippet,
-        category: '',
-        rating: '',
-        address: r.url,
-        ticket: '',
-        openingHours: '',
-      }))
-      // Merge with existing suggested places from queryLocalPlaces
-      toolResultStore.suggestedPlaces = [
-        ...(toolResultStore.suggestedPlaces || []),
-        ...places,
-      ]
       logger.info('tools', `webSearch("${query}") → ${results.length} results`, {
         titles: results.map((r: any) => r.title),
         answer: (data.answer || '').slice(0, 100),
