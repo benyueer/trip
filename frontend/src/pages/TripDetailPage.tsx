@@ -58,7 +58,7 @@ const TripDetailPage: React.FC = () => {
   }
 
   return (
-    <div className='w-screen h-screen relative overflow-hidden bg-gray-50 font-sans'>
+    <div className='w-full h-full relative overflow-hidden bg-gray-50 font-sans'>
       <button
         onClick={() => navigate('/')}
         className='absolute top-6 left-6 z-10 bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-white hover:bg-white transition-all active:scale-95 flex items-center justify-center text-gray-700'
