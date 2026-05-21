@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Plus, Trash2, Loader2, Bot, User, MapPin, ArrowLeft, MessageSquare } from 'lucide-react'
 import { useTripStore } from '../store'
 import { AgentSuggestedPlaceCard } from './AgentSuggestedPlaceCard'
+import { AgentDayPlanCard } from './AgentDayPlanCard'
 import ReactMarkdown from 'react-markdown'
 
 export function AgentPanel() {
@@ -270,6 +271,14 @@ export function AgentPanel() {
                             </span>
                           </div>
                         </motion.div>
+                      )}
+
+                      {msg.metadata?.dayPlan && (
+                        <AgentDayPlanCard
+                          plan={msg.metadata.dayPlan}
+                          onAccept={() => {}}
+                          onReject={() => {}}
+                        />
                       )}
                     </div>
                   </div>

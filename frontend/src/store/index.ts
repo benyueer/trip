@@ -104,6 +104,26 @@ export interface AgentMessage {
     modifiedTripId?: string
     blocked?: boolean
     reason?: string
+    dayPlan?: {
+      dayIndex: number
+      title: string
+      description?: string
+      places: Array<{
+        name: string
+        lngLat: [number, number]
+        description?: string
+        category?: string
+        address?: string
+        rating?: string
+        ticket?: string
+        openingHours?: string
+        order: number
+      }>
+      routeInfo?: {
+        totalDistance: string
+        totalDuration: string
+      }
+    }
   }
   createdAt: string
 }
