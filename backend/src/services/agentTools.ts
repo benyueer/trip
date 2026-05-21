@@ -13,6 +13,26 @@ export const toolResultStore = {
   createdTripTitle: null as string | null,
   modifiedTripId: null as string | null,
   modifiedAction: null as string | null,
+  dayPlan: null as {
+    dayIndex: number
+    title: string
+    description: string
+    places: Array<{
+      name: string
+      lngLat: [number, number]
+      description: string
+      category: string
+      address: string
+      rating: string
+      ticket: string
+      openingHours: string
+      order: number
+    }>
+    routeInfo?: {
+      totalDistance: string
+      totalDuration: string
+    }
+  } | null,
   reset(runId: string) {
     this.runId = runId
     this.suggestedPlaces = null
@@ -20,6 +40,7 @@ export const toolResultStore = {
     this.createdTripTitle = null
     this.modifiedTripId = null
     this.modifiedAction = null
+    this.dayPlan = null
   },
   getResults(runId: string) {
     // Only return results if they belong to this run
@@ -30,6 +51,7 @@ export const toolResultStore = {
       createdTripTitle: this.createdTripTitle,
       modifiedTripId: this.modifiedTripId,
       modifiedAction: this.modifiedAction,
+      dayPlan: this.dayPlan,
     }
   },
 }
@@ -278,6 +300,54 @@ export const modifyTripPlan = tool({
       dayIndex,
       placeName,
       remainingPlaces: day.items.filter(i => i.type === 'place').length,
+    }
+  },
+})
+
+// Tool 6: Plan a single day route
+export const planDayRoute = tool({
+  description: 'Plan a single day itinerary with ordered places. Use when user asks to plan one specific day (e.g. "规划day2的千岛湖旅行"). Returns a plan for user review before creating the actual trip.',
+  inputSchema: z.object({
+    dayIndex: z.number().describe('Which day to plan (1-based)'),
+    title: z.string().describe('Plan title, e.g. "千岛湖一日游"'),
+    description: z.string().optional().describe('Day theme, e.g. "湖光山色"'),
+    places: z.array(z.object({
+      name: z.string().describe('Place name'),
+      lngLat: z.array(z.number()).describe('[longitude, latitude]'),
+      description: z.string().optional().describe('Why visit this place'),
+      category: z.string().optional(),
+      address: z.string().optional(),
+      rating: z.string().optional(),
+      ticket: z.string().optional(),
+      openingHours: z.string().optional(),
+      order: z.number().describe('Visit order (1-based)'),
+    })).describe('Ordered list of places to visit'),
+  }),
+  execute: async ({ dayIndex, title, description, places }) => {
+    logger.agent.toolCall('planDayRoute', { dayIndex, title, placesCount: places.length })
+    const plan = {
+      dayIndex,
+      title,
+      description: description || '',
+      places: places.map(p => ({
+        ...p,
+        lngLat: p.lngLat as [number, number],
+        description: p.description || '',
+        category: p.category || '',
+        address: p.address || '',
+        rating: p.rating || '',
+        ticket: p.ticket || '',
+        openingHours: p.openingHours || '',
+      })),
+    }
+    toolResultStore.dayPlan = plan
+    logger.info('tools', `planDayRoute(day${dayIndex}, "${title}") → ${places.length} places`, {
+      places: places.map(p => p.name),
+    })
+    return {
+      status: 'plan_ready',
+      plan,
+      message: `已为您规划第${dayIndex}天的行程，请查看方案并选择接受或拒绝。`,
     }
   },
 })

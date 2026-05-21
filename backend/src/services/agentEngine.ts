@@ -1,7 +1,7 @@
 import { streamText, ModelMessage, stepCountIs, tool } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { agentRepository } from '../repositories/AgentRepository'
-import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan, toolResultStore } from './agentTools'
+import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan, planDayRoute, toolResultStore } from './agentTools'
 import { logger } from './logger'
 import { getMCPTools, callMCPTool } from './mcpClient'
 import { z } from 'zod'
@@ -81,6 +81,7 @@ export interface StreamMetadata {
   tripTitle?: string
   modifiedTripId?: string
   reasoning?: string
+  dayPlan?: any
 }
 
 /**
@@ -200,6 +201,7 @@ export async function streamChatWithAgent(
       saveUserMemory,
       createTripPlan,
       modifyTripPlan,
+      planDayRoute,
       ...mcpToolsMap,
     },
     stopWhen: stepCountIs(5),
@@ -250,11 +252,18 @@ export async function streamChatWithAgent(
         logger.agent.tripModified(results.modifiedTripId, results.modifiedAction || 'unknown')
       }
 
+      // Day plan
+      if (results.dayPlan) {
+        metadata.dayPlan = results.dayPlan
+        logger.info('agent', `Day plan ready: ${results.dayPlan.title}`)
+      }
+
       // Log assistant response
       const toolsUsed: string[] = []
       if (results.suggestedPlaces) toolsUsed.push('search')
       if (results.createdTripId) toolsUsed.push('createTripPlan')
       if (results.modifiedTripId) toolsUsed.push('modifyTripPlan')
+      if (results.dayPlan) toolsUsed.push('planDayRoute')
       logger.info('agent', `Response: ${finalText.slice(0, 150)}${finalText.length > 150 ? '...' : ''}`, {
         sessionId: sessionId.slice(0, 8),
         toolsUsed,
