@@ -184,9 +184,13 @@ export function AgentPanel() {
                       {msg.role === 'assistant' ? (
                         <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
-                          {/* Blinking cursor while streaming */}
+                          {/* Typing dots while streaming */}
                           {agentLoading && msg.id === agentMessages[agentMessages.length - 1]?.id && (
-                            <span className="inline-block w-0.5 h-4 bg-gray-800 ml-0.5 animate-pulse align-middle" />
+                            <span className="inline-flex gap-0.5 ml-1 align-middle">
+                              <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </span>
                           )}
                         </div>
                       ) : (
