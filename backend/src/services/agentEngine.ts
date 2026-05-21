@@ -279,6 +279,7 @@ export async function streamChatWithAgent(
               title: `第${dayIndex}天行程`,
               description: '',
               places: placesFromMCP,
+              routes: [],
             }
             toolResultStore.dayPlan = dayPlan
             results.dayPlan = dayPlan

@@ -4,6 +4,7 @@ import { agentRepository } from '../repositories/AgentRepository'
 import { tripRepository } from '../repositories/TripRepository'
 import { callMCPTool } from './mcpClient'
 import { logger } from './logger'
+import { calculateRoutesBetweenPlaces } from './routeCalculator'
 
 // Shared store for tool execution results — tools write here, engine reads after stream
 // Uses a runId to isolate results between concurrent message processing
@@ -30,10 +31,11 @@ export const toolResultStore = {
       openingHours: string
       order: number
     }>
-    routeInfo?: {
-      totalDistance: string
-      totalDuration: string
-    }
+    routes: Array<{
+      distance: string
+      duration: string
+      path: [number, number][]
+    }>
   } | null,
   reset(runId: string) {
     this.runId = runId
@@ -314,25 +316,29 @@ export const planDayRoute = tool({
   }),
   execute: async ({ dayIndex, title, description, places }) => {
     logger.agent.toolCall('planDayRoute', { dayIndex, title, placesCount: places.length })
+    const mappedPlaces = places.map(p => ({
+      ...p,
+      lngLat: p.lngLat as [number, number],
+      description: p.description || '',
+      category: p.category || '',
+      address: p.address || '',
+      rating: p.rating || '',
+      ticket: p.ticket || '',
+      openingHours: p.openingHours || '',
+    }))
+
+    // Calculate routes between consecutive places
+    const routes = await calculateRoutesBetweenPlaces(mappedPlaces)
+
     const plan = {
       dayIndex,
       title,
       description: description || '',
-      places: places.map(p => ({
-        ...p,
-        lngLat: p.lngLat as [number, number],
-        description: p.description || '',
-        category: p.category || '',
-        address: p.address || '',
-        rating: p.rating || '',
-        ticket: p.ticket || '',
-        openingHours: p.openingHours || '',
-      })),
+      places: mappedPlaces,
+      routes,
     }
     toolResultStore.dayPlan = plan
-    logger.info('tools', `planDayRoute(day${dayIndex}, "${title}") → ${places.length} places`, {
-      places: places.map(p => p.name),
-    })
+    logger.info('tools', `planDayRoute(day${dayIndex}, "${title}") → ${mappedPlaces.length} places, ${routes.length} routes`)
     return {
       status: 'plan_ready',
       plan,
