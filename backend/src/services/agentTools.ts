@@ -65,43 +65,30 @@ export const queryLocalPlaces = tool({
   },
 })
 
-// Tool 2: Web search (via Tavily or fallback)
+// Tool 2: Web search (DuckDuckGo — free, no API key)
 export const webSearch = tool({
   description: 'Search the web for latest travel information, recommendations, and destination details. Use when local data is insufficient.',
   inputSchema: z.object({
-    query: z.string().describe('Search query, e.g. "新疆草原推荐 2025"'),
+    query: z.string().describe('Search query, e.g. "新疆草原推荐"'),
   }),
   execute: async ({ query }) => {
-    const tavilyKey = process.env.TAVILY_API_KEY
-    if (tavilyKey) {
-      try {
-        const response = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: tavilyKey,
-            query,
-            max_results: 5,
-            include_answer: true,
-          }),
+    try {
+      const ddg = require('duckduckgo-search')
+      const results: any[] = []
+      for await (const r of ddg.text(query, { safeSearch: 'moderate', maxResults: 5 })) {
+        results.push({
+          title: r.title,
+          snippet: (r.description || r.body || '').slice(0, 200),
+          url: r.url || r.href || '',
         })
-        const data = await response.json()
-        return {
-          answer: data.answer || '',
-          results: (data.results || []).map((r: any) => ({
-            title: r.title,
-            snippet: r.content?.slice(0, 200),
-            url: r.url,
-          })),
-        }
-      } catch (error) {
-        return { answer: 'Search temporarily unavailable', results: [] }
+        if (results.length >= 5) break
       }
-    }
-    // Fallback: return empty with message
-    return {
-      answer: 'Web search is not configured. Please set TAVILY_API_KEY.',
-      results: [],
+      return {
+        answer: results.length > 0 ? `Found ${results.length} results for "${query}"` : 'No results found',
+        results,
+      }
+    } catch (error) {
+      return { answer: 'Search temporarily unavailable', results: [] }
     }
   },
 })
