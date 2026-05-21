@@ -70,7 +70,7 @@ export const queryLocalPlaces = tool({
   },
 })
 
-// Tool 2: Web search (DuckDuckGo Lite — free, no API key)
+// Tool 2: Web search (Tavily — designed for AI agents)
 export const webSearch = tool({
   description: 'Search the web for latest travel information, recommendations, and destination details. Use when local data is insufficient.',
   inputSchema: z.object({
@@ -78,45 +78,36 @@ export const webSearch = tool({
   }),
   execute: async ({ query }) => {
     logger.agent.toolCall('webSearch', { query })
+    const tavilyKey = process.env.TAVILY_API_KEY
+    if (!tavilyKey) {
+      logger.error('tools', 'TAVILY_API_KEY not configured')
+      return { answer: 'Web search not configured', results: [] }
+    }
     try {
-      const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        },
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query,
+          max_results: 5,
+          include_answer: true,
+          search_depth: 'basic',
+        }),
+        signal: AbortSignal.timeout(10000),
       })
-      const html = await response.text()
-
-      // Parse results from DuckDuckGo Lite HTML
-      const results: { title: string; snippet: string; url: string }[] = []
-      const linkRegex = /<a[^>]+class="result-link"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi
-      const snippetRegex = /<td[^>]*class="result-snippet"[^>]*>([\s\S]*?)<\/td>/gi
-
-      let linkMatch
-      const links: { url: string; title: string }[] = []
-      while ((linkMatch = linkRegex.exec(html)) !== null) {
-        links.push({ url: linkMatch[1], title: linkMatch[2].trim() })
-      }
-
-      let snippetMatch
-      const snippets: string[] = []
-      while ((snippetMatch = snippetRegex.exec(html)) !== null) {
-        snippets.push(snippetMatch[1].replace(/<[^>]*>/g, '').trim())
-      }
-
-      for (let i = 0; i < Math.min(links.length, 5); i++) {
-        results.push({
-          title: links[i].title,
-          snippet: (snippets[i] || '').slice(0, 200),
-          url: links[i].url,
-        })
-      }
-
+      const data = await response.json()
+      const results = (data.results || []).map((r: any) => ({
+        title: r.title || '',
+        snippet: (r.content || '').slice(0, 200),
+        url: r.url || '',
+      }))
       logger.info('tools', `webSearch("${query}") → ${results.length} results`, {
-        titles: results.map(r => r.title),
+        titles: results.map((r: any) => r.title),
+        answer: (data.answer || '').slice(0, 100),
       })
       return {
-        answer: results.length > 0 ? `Found ${results.length} results for "${query}"` : 'No results found',
+        answer: data.answer || `Found ${results.length} results`,
         results,
       }
     } catch (error) {
