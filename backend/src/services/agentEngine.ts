@@ -73,7 +73,12 @@ const SYSTEM_PROMPT = `你是一个专业的旅行规划助手。你的职责是
 - 当用户要求修改行程时，使用 modifyTripPlan 工具修改
 - 回复要简洁、有用，适合旅行场景
 - 如果用户的问题与旅行无关，礼貌地告知你只能帮助旅行规划相关的问题
-- 你还可以使用高德地图 MCP 工具进行路线规划和地点搜索（工具名以 mcp_ 为前缀）`
+- 你还可以使用高德地图 MCP 工具进行路线规划和地点搜索（工具名以 mcp_ 为前缀）
+- 当用户要求规划某一天的行程时（如"规划day2的千岛湖旅行"），使用 planDayRoute 工具生成方案
+- planDayRoute 只生成备选方案，不会直接创建行程，用户需要确认后才生效
+- 规划时先用 webSearch 搜索目的地信息，再结合 queryLocalPlaces 查询本地数据
+- 给出合理的路线顺序，考虑地理位置就近原则
+- 回复时说明规划思路，并提示用户可以接受或拒绝方案`
 
 export interface StreamMetadata {
   suggestedPlaces?: any[]
