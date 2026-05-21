@@ -11,6 +11,7 @@ import shareRoutes from './routes/shareRoutes'
 import userRoutes from './routes/userRoutes'
 import agentRoutes from './routes/agentRoutes'
 import mcpRoutes from './routes/mcpRoutes'
+import { logger } from './services/logger'
 
 dotenv.config()
 
@@ -49,6 +50,18 @@ app.use(session({
 // Passport
 app.use(passport.initialize())
 app.use(passport.session())
+
+// Request logger
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const elapsed = Date.now() - start
+    const status = res.statusCode
+    const level = status >= 400 ? 'error' : 'info'
+    logger[level]('http', `${req.method} ${req.originalUrl} ${status} ${elapsed}ms`)
+  })
+  next()
+})
 
 // Routes
 app.use('/auth', authRoutes)

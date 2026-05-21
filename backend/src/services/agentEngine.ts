@@ -2,6 +2,7 @@ import { streamText, ModelMessage, stepCountIs } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { agentRepository } from '../repositories/AgentRepository'
 import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan } from './agentTools'
+import { logger } from './logger'
 
 function getLLM() {
   const apiKey = process.env.LLM_API_KEY
@@ -14,8 +15,46 @@ function getLLM() {
   const openai = createOpenAI({
     apiKey,
     baseURL,
+    fetch: async (url, options) => {
+      if (options && options.body && typeof options.body === 'string') {
+        try {
+          const body = JSON.parse(options.body)
+          if (body.messages && Array.isArray(body.messages)) {
+            body.messages = body.messages.map((m: any) => {
+              if (m.role === 'assistant') {
+                let reasoningText = ''
+                let plainText = m.content
+
+                if (Array.isArray(m.content)) {
+                  const textParts = []
+                  for (const part of m.content) {
+                    if (part.type === 'reasoning') {
+                      reasoningText = part.text || ''
+                    } else if (part.type === 'text') {
+                      textParts.push(part.text || '')
+                    }
+                  }
+                  plainText = textParts.join('\n')
+                }
+
+                return {
+                  ...m,
+                  content: plainText || null,
+                  reasoning_content: reasoningText || ' ',
+                }
+              }
+              return m
+            })
+            options.body = JSON.stringify(body)
+          }
+        } catch (e) {
+          console.error('Error rewriting request body:', e)
+        }
+      }
+      return fetch(url, options)
+    },
   })
-  return openai(model)
+  return openai.chat(model)
 }
 
 const SYSTEM_PROMPT = `你是一个专业的旅行规划助手。你的职责是：
@@ -38,6 +77,7 @@ export interface StreamMetadata {
   tripId?: string
   tripTitle?: string
   modifiedTripId?: string
+  reasoning?: string
 }
 
 /**
@@ -55,13 +95,37 @@ export async function streamChatWithAgent(
 
   // 2. Load short-term memory (conversation history)
   const history = await agentRepository.findMessagesBySession(sessionId)
-  const messages: ModelMessage[] = history
+  const messages: any[] = history
     .reverse()
     .slice(-20)
-    .map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    }))
+    .map(m => {
+      if (m.role === 'assistant') {
+        const meta = m.metadata as any
+        let reasoning = ' '
+        if (meta?.reasoning) {
+          if (typeof meta.reasoning === 'string') {
+            reasoning = meta.reasoning
+          } else if (Array.isArray(meta.reasoning)) {
+            reasoning = meta.reasoning
+              .map((r: any) => (typeof r === 'string' ? r : JSON.stringify(r)))
+              .join('\n') || ' '
+          } else {
+            reasoning = String(meta.reasoning)
+          }
+        }
+        return {
+          role: 'assistant',
+          content: [
+            { type: 'reasoning', text: reasoning },
+            { type: 'text', text: m.content || ' ' },
+          ],
+        }
+      }
+      return {
+        role: m.role,
+        content: m.content || ' ',
+      }
+    })
 
   // 3. Load long-term memory (user preferences)
   const memories = await agentRepository.findMemoriesByUser(userId)
@@ -98,9 +162,20 @@ export async function streamChatWithAgent(
     },
     stopWhen: stepCountIs(5),
     toolChoice: 'auto',
-    onFinish: async ({ text, toolResults }) => {
+    onFinish: async ({ text, toolResults, reasoning }) => {
+      // Log tool calls
+      for (const toolResult of toolResults) {
+        logger.agent.toolCall(toolResult.toolName, (toolResult as any).input)
+        logger.agent.toolResult(toolResult.toolName, toolResult.output)
+      }
+
       // Extract metadata from tool results
       const metadata: StreamMetadata = {}
+      if (reasoning) {
+        metadata.reasoning = Array.isArray(reasoning)
+          ? reasoning.map((r: any) => r.text || JSON.stringify(r)).join('\n')
+          : String(reasoning)
+      }
       for (const toolResult of toolResults) {
         if (toolResult.toolName === 'queryLocalPlaces' || toolResult.toolName === 'webSearch') {
           const res = toolResult.output as any
@@ -113,15 +188,29 @@ export async function streamChatWithAgent(
           if (res.tripId) {
             metadata.tripId = res.tripId
             metadata.tripTitle = res.title
+            logger.agent.tripCreated(res.tripId, res.title)
           }
         }
         if (toolResult.toolName === 'modifyTripPlan') {
           const res = toolResult.output as any
           if (res.tripId) {
             metadata.modifiedTripId = res.tripId
+            logger.agent.tripModified(res.tripId, res.action)
+          }
+        }
+        if (toolResult.toolName === 'saveUserMemory') {
+          const res = toolResult.output as any
+          if (res.saved) {
+            logger.agent.memory(res.action, String((toolResult as any).input?.content || ''))
           }
         }
       }
+
+      // Log assistant response
+      logger.info('agent', `Response: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`, {
+        sessionId: sessionId.slice(0, 8),
+        toolsUsed: toolResults.map(t => t.toolName),
+      })
 
       // Persist the final message + metadata to DB
       await agentRepository.createMessage(sessionId, 'assistant', text, metadata)
