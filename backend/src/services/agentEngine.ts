@@ -176,6 +176,23 @@ export async function streamChatWithAgent(
     onFinish: async ({ text, reasoning }) => {
       // Read tool results from the shared store (isolated by runId)
       const results = toolResultStore.getResults(runId)
+
+      // Fallback: if model returned empty text, generate a summary from tool results
+      let finalText = text
+      if (!finalText || !finalText.trim()) {
+        const parts: string[] = []
+        if (results.suggestedPlaces && results.suggestedPlaces.length > 0) {
+          parts.push(`为您找到 ${results.suggestedPlaces.length} 个相关地点：${results.suggestedPlaces.map((p: any) => p.name).join('、')}`)
+        }
+        if (results.createdTripId) {
+          parts.push(`已创建行程「${results.createdTripTitle}」`)
+        }
+        if (results.modifiedTripId) {
+          parts.push(`已更新行程`)
+        }
+        finalText = parts.length > 0 ? parts.join('。') + '。' : '已处理您的请求。'
+        logger.warn('agent', 'Model returned empty text, generated fallback', { fallback: finalText })
+      }
       const metadata: StreamMetadata = {}
       if (reasoning) {
         metadata.reasoning = Array.isArray(reasoning)
@@ -207,13 +224,13 @@ export async function streamChatWithAgent(
       if (results.suggestedPlaces) toolsUsed.push('search')
       if (results.createdTripId) toolsUsed.push('createTripPlan')
       if (results.modifiedTripId) toolsUsed.push('modifyTripPlan')
-      logger.info('agent', `Response: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`, {
+      logger.info('agent', `Response: ${finalText.slice(0, 150)}${finalText.length > 150 ? '...' : ''}`, {
         sessionId: sessionId.slice(0, 8),
         toolsUsed,
       })
 
       // Persist the final message + metadata to DB
-      await agentRepository.createMessage(sessionId, 'assistant', text, metadata)
+      await agentRepository.createMessage(sessionId, 'assistant', finalText, metadata)
 
       // Resolve the metadata promise so the controller can append it to the stream
       resolveMetadata!(metadata)
