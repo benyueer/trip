@@ -94,6 +94,7 @@ export interface StreamMetadata {
   modifiedTripId?: string
   reasoning?: string
   dayPlan?: any
+  _responseText?: string
 }
 
 /**
@@ -336,7 +337,8 @@ export async function streamChatWithAgent(
       // Persist the final message + metadata to DB
       await agentRepository.createMessage(sessionId, 'assistant', finalText, metadata)
 
-      // Resolve the metadata promise so the controller can append it to the stream
+      // Include response text so controller can write it to the stream
+      metadata._responseText = finalText
       resolveMetadata!(metadata)
     },
   })

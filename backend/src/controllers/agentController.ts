@@ -112,7 +112,15 @@ export const chat = async (req: Request, res: Response) => {
 
     // Wait for onFinish to complete and append metadata to the stream
     const metadata = await metadataPromise
-    const metaLine = `\n__AGENT_META__${JSON.stringify(metadata)}`
+
+    // If the stream was empty but onFinish generated a summary, write it now
+    if (totalChars === 0 && metadata._responseText) {
+      res.write(metadata._responseText)
+    }
+
+    // Strip _responseText from metadata before sending to client
+    const { _responseText, ...clientMetadata } = metadata
+    const metaLine = `\n__AGENT_META__${JSON.stringify(clientMetadata)}`
     res.write(metaLine)
     res.end()
 
