@@ -155,8 +155,9 @@ export async function streamChatWithAgent(
     }
   }
 
-  // 5. Reset tool result store before each run
-  toolResultStore.reset()
+  // 5. Reset tool result store before each run with unique runId
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  toolResultStore.reset(runId)
 
   // 6. Run agent with streaming + tools
   const result = streamText({
@@ -173,7 +174,8 @@ export async function streamChatWithAgent(
     stopWhen: stepCountIs(5),
     toolChoice: 'auto',
     onFinish: async ({ text, reasoning }) => {
-      // Read tool results from the shared store (more reliable than onFinish toolResults)
+      // Read tool results from the shared store (isolated by runId)
+      const results = toolResultStore.getResults(runId)
       const metadata: StreamMetadata = {}
       if (reasoning) {
         metadata.reasoning = Array.isArray(reasoning)
@@ -182,29 +184,29 @@ export async function streamChatWithAgent(
       }
 
       // Suggested places
-      if (toolResultStore.suggestedPlaces) {
-        metadata.suggestedPlaces = toolResultStore.suggestedPlaces
-        logger.info('agent', `Found ${toolResultStore.suggestedPlaces.length} suggested places`)
+      if (results.suggestedPlaces) {
+        metadata.suggestedPlaces = results.suggestedPlaces
+        logger.info('agent', `Found ${results.suggestedPlaces.length} suggested places`)
       }
 
       // Trip created
-      if (toolResultStore.createdTripId) {
-        metadata.tripId = toolResultStore.createdTripId
-        metadata.tripTitle = toolResultStore.createdTripTitle || ''
-        logger.agent.tripCreated(toolResultStore.createdTripId, toolResultStore.createdTripTitle || '')
+      if (results.createdTripId) {
+        metadata.tripId = results.createdTripId
+        metadata.tripTitle = results.createdTripTitle || ''
+        logger.agent.tripCreated(results.createdTripId, results.createdTripTitle || '')
       }
 
       // Trip modified
-      if (toolResultStore.modifiedTripId) {
-        metadata.modifiedTripId = toolResultStore.modifiedTripId
-        logger.agent.tripModified(toolResultStore.modifiedTripId, toolResultStore.modifiedAction || 'unknown')
+      if (results.modifiedTripId) {
+        metadata.modifiedTripId = results.modifiedTripId
+        logger.agent.tripModified(results.modifiedTripId, results.modifiedAction || 'unknown')
       }
 
       // Log assistant response
       const toolsUsed: string[] = []
-      if (toolResultStore.suggestedPlaces) toolsUsed.push('search')
-      if (toolResultStore.createdTripId) toolsUsed.push('createTripPlan')
-      if (toolResultStore.modifiedTripId) toolsUsed.push('modifyTripPlan')
+      if (results.suggestedPlaces) toolsUsed.push('search')
+      if (results.createdTripId) toolsUsed.push('createTripPlan')
+      if (results.modifiedTripId) toolsUsed.push('modifyTripPlan')
       logger.info('agent', `Response: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`, {
         sessionId: sessionId.slice(0, 8),
         toolsUsed,

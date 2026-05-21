@@ -4,18 +4,32 @@ import { agentRepository } from '../repositories/AgentRepository'
 import { tripRepository } from '../repositories/TripRepository'
 
 // Shared store for tool execution results — tools write here, engine reads after stream
+// Uses a runId to isolate results between concurrent message processing
 export const toolResultStore = {
+  runId: '',
   suggestedPlaces: null as any[] | null,
   createdTripId: null as string | null,
   createdTripTitle: null as string | null,
   modifiedTripId: null as string | null,
   modifiedAction: null as string | null,
-  reset() {
+  reset(runId: string) {
+    this.runId = runId
     this.suggestedPlaces = null
     this.createdTripId = null
     this.createdTripTitle = null
     this.modifiedTripId = null
     this.modifiedAction = null
+  },
+  getResults(runId: string) {
+    // Only return results if they belong to this run
+    if (this.runId !== runId) return {}
+    return {
+      suggestedPlaces: this.suggestedPlaces,
+      createdTripId: this.createdTripId,
+      createdTripTitle: this.createdTripTitle,
+      modifiedTripId: this.modifiedTripId,
+      modifiedAction: this.modifiedAction,
+    }
   },
 }
 
