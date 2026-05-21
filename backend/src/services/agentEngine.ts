@@ -1,7 +1,7 @@
 import { streamText, ModelMessage, stepCountIs } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { agentRepository } from '../repositories/AgentRepository'
-import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan } from './agentTools'
+import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan, toolResultStore } from './agentTools'
 import { logger } from './logger'
 
 function getLLM() {
@@ -151,7 +151,10 @@ export async function streamChatWithAgent(
     }
   }
 
-  // 5. Run agent with streaming + tools
+  // 5. Reset tool result store before each run
+  toolResultStore.reset()
+
+  // 6. Run agent with streaming + tools
   const result = streamText({
     model: getLLM(),
     system: systemPrompt,
@@ -165,14 +168,8 @@ export async function streamChatWithAgent(
     },
     stopWhen: stepCountIs(5),
     toolChoice: 'auto',
-    onFinish: async ({ text, toolResults, reasoning }) => {
-      // Log tool calls
-      for (const toolResult of toolResults) {
-        logger.agent.toolCall(toolResult.toolName, (toolResult as any).input)
-        logger.agent.toolResult(toolResult.toolName, toolResult.output)
-      }
-
-      // Extract metadata from tool results
+    onFinish: async ({ text, reasoning }) => {
+      // Read tool results from the shared store (more reliable than onFinish toolResults)
       const metadata: StreamMetadata = {}
       if (reasoning) {
         metadata.reasoning = Array.isArray(reasoning)
@@ -180,42 +177,33 @@ export async function streamChatWithAgent(
           : String(reasoning)
       }
 
-      logger.info('agent', `Processing ${toolResults.length} tool results`)
+      // Suggested places
+      if (toolResultStore.suggestedPlaces) {
+        metadata.suggestedPlaces = toolResultStore.suggestedPlaces
+        logger.info('agent', `Found ${toolResultStore.suggestedPlaces.length} suggested places`)
+      }
 
-      for (const toolResult of toolResults) {
-        const res = toolResult.output as any
-        const toolName = toolResult.toolName
+      // Trip created
+      if (toolResultStore.createdTripId) {
+        metadata.tripId = toolResultStore.createdTripId
+        metadata.tripTitle = toolResultStore.createdTripTitle || ''
+        logger.agent.tripCreated(toolResultStore.createdTripId, toolResultStore.createdTripTitle || '')
+      }
 
-        logger.info('agent', `Tool: ${toolName}`, { output: JSON.stringify(res).slice(0, 300) })
-
-        // Suggested places from search tools
-        if (res?.places) {
-          metadata.suggestedPlaces = res.places
-        }
-
-        // Trip creation
-        if (toolName === 'createTripPlan' && res?.tripId) {
-          metadata.tripId = res.tripId
-          metadata.tripTitle = res.title
-          logger.agent.tripCreated(res.tripId, res.title)
-        }
-
-        // Trip modification — check both toolName and generic tripId presence
-        if (res?.tripId && (toolName === 'modifyTripPlan' || res?.action)) {
-          metadata.modifiedTripId = res.tripId
-          logger.agent.tripModified(res.tripId, res.action || 'unknown')
-        }
-
-        // Memory save
-        if (toolName === 'saveUserMemory' && res?.saved) {
-          logger.agent.memory(res.action, String((toolResult as any).input?.content || ''))
-        }
+      // Trip modified
+      if (toolResultStore.modifiedTripId) {
+        metadata.modifiedTripId = toolResultStore.modifiedTripId
+        logger.agent.tripModified(toolResultStore.modifiedTripId, toolResultStore.modifiedAction || 'unknown')
       }
 
       // Log assistant response
+      const toolsUsed: string[] = []
+      if (toolResultStore.suggestedPlaces) toolsUsed.push('search')
+      if (toolResultStore.createdTripId) toolsUsed.push('createTripPlan')
+      if (toolResultStore.modifiedTripId) toolsUsed.push('modifyTripPlan')
       logger.info('agent', `Response: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`, {
         sessionId: sessionId.slice(0, 8),
-        toolsUsed: toolResults.map(t => t.toolName),
+        toolsUsed,
       })
 
       // Persist the final message + metadata to DB

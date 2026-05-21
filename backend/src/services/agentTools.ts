@@ -3,6 +3,22 @@ import { z } from 'zod'
 import { agentRepository } from '../repositories/AgentRepository'
 import { tripRepository } from '../repositories/TripRepository'
 
+// Shared store for tool execution results — tools write here, engine reads after stream
+export const toolResultStore = {
+  suggestedPlaces: null as any[] | null,
+  createdTripId: null as string | null,
+  createdTripTitle: null as string | null,
+  modifiedTripId: null as string | null,
+  modifiedAction: null as string | null,
+  reset() {
+    this.suggestedPlaces = null
+    this.createdTripId = null
+    this.createdTripTitle = null
+    this.modifiedTripId = null
+    this.modifiedAction = null
+  },
+}
+
 // Tool 1: Query local places from database
 export const queryLocalPlaces = tool({
   description: 'Search for travel destinations, attractions, and places in the local database. Returns matching places with coordinates, ratings, and details.',
@@ -30,6 +46,7 @@ export const queryLocalPlaces = tool({
         ticket: p.ticket,
         openingHours: p.openingHours,
       }))
+    toolResultStore.suggestedPlaces = filtered
     return { places: filtered, count: filtered.length }
   },
 })
@@ -108,7 +125,7 @@ export const createTripPlan = tool({
       dayIndex: z.number(),
       items: z.array(z.object({
         name: z.string(),
-        lngLat: z.tuple([z.number(), z.number()]),
+        lngLat: z.array(z.number()).describe('[longitude, latitude]'),
         description: z.string().optional(),
         category: z.string().optional(),
         address: z.string().optional(),
@@ -138,6 +155,8 @@ export const createTripPlan = tool({
       })),
     }
     const trip = await tripRepository.create(tripData, userId)
+    toolResultStore.createdTripId = trip!.id
+    toolResultStore.createdTripTitle = trip!.title
     return { tripId: trip!.id, title: trip!.title, days: trip!.days.length }
   },
 })
@@ -152,7 +171,7 @@ export const modifyTripPlan = tool({
     placeName: z.string().describe('Name of the place to add/remove/replace'),
     newPlace: z.object({
       name: z.string(),
-      lngLat: z.tuple([z.number(), z.number()]),
+      lngLat: z.array(z.number()).describe('[longitude, latitude]'),
       description: z.string().optional(),
       category: z.string().optional(),
       address: z.string().optional(),
@@ -200,6 +219,8 @@ export const modifyTripPlan = tool({
     }
 
     const updatedTrip = await tripRepository.update(tripId, trip)
+    toolResultStore.modifiedTripId = updatedTrip!.id
+    toolResultStore.modifiedAction = action
     return {
       tripId: updatedTrip!.id,
       action,
