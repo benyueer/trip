@@ -1,4 +1,4 @@
-import { streamText, ModelMessage, stepCountIs, tool } from 'ai'
+import { streamText, generateText, ModelMessage, stepCountIs, tool } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { agentRepository } from '../repositories/AgentRepository'
 import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan, planDayRoute, toolResultStore } from './agentTools'
@@ -226,50 +226,69 @@ export async function streamChatWithAgent(
       // Read tool results from the shared store (isolated by runId)
       const results = toolResultStore.getResults(runId)
 
-      // Fallback: if model returned empty text, generate a summary from tool results
+      // If model returned empty text, call LLM again to summarize tool results
       let finalText = text
       if (!finalText || !finalText.trim()) {
-        const parts: string[] = []
+        logger.warn('agent', 'Model returned empty text, requesting summary from LLM')
 
-        // Extract place names from MCP text search results
-        const mcpPlaces: string[] = []
+        // Build a summary prompt from tool results
+        const toolSummary: string[] = []
+        if (results.dayPlan) {
+          toolSummary.push(`planDayRoute 结果：已规划「${results.dayPlan.title}」，包含地点：${results.dayPlan.places.map((p: any) => `${p.name}(${p.description || ''})`).join('、')}`)
+        }
+        if (results.suggestedPlaces && results.suggestedPlaces.length > 0) {
+          toolSummary.push(`地点搜索结果：${results.suggestedPlaces.map((p: any) => `${p.name}${p.address ? '-' + p.address : ''}`).join('、')}`)
+        }
+        if (results.createdTripId) {
+          toolSummary.push(`已创建行程「${results.createdTripTitle}」`)
+        }
+        if (results.modifiedTripId) {
+          toolSummary.push(`已修改行程`)
+        }
         if (results._mcpCalls) {
           for (const call of results._mcpCalls) {
-            if (call.toolName.includes('text_search') && call.result) {
-              const content = Array.isArray(call.result) ? call.result : []
-              for (const item of content) {
+            const toolName = call.toolName.replace('mcp_maps_', '')
+            // Extract meaningful text from MCP results
+            const mcpTexts: string[] = []
+            if (Array.isArray(call.result)) {
+              for (const item of call.result) {
                 if (item.type === 'text' && item.text) {
                   try {
                     const data = JSON.parse(item.text)
                     if (data.pois) {
-                      for (const poi of data.pois.slice(0, 5)) {
-                        if (poi.name) mcpPlaces.push(poi.name)
-                      }
+                      mcpTexts.push(...data.pois.slice(0, 5).map((p: any) => p.name).filter(Boolean))
+                    } else if (data.route) {
+                      mcpTexts.push(`路线距离${data.route.distance || '未知'}，耗时${data.route.duration || '未知'}`)
                     }
-                  } catch {}
+                  } catch {
+                    mcpTexts.push(item.text.slice(0, 100))
+                  }
                 }
               }
             }
+            toolSummary.push(`高德${toolName}：${mcpTexts.length > 0 ? mcpTexts.join('、') : '查询完成'}`)
           }
         }
 
-        if (results.dayPlan) {
-          parts.push(`已为您规划「${results.dayPlan.title}」，包含 ${results.dayPlan.places.length} 个地点：${results.dayPlan.places.map((p: any) => p.name).join('→')}，请查看下方方案卡片，可以接受或重新规划。`)
-        } else if (results.suggestedPlaces && results.suggestedPlaces.length > 0) {
-          parts.push(`为您找到 ${results.suggestedPlaces.length} 个相关地点：${results.suggestedPlaces.map((p: any) => p.name).join('、')}`)
-        } else if (mcpPlaces.length > 0) {
-          parts.push(`为您找到以下相关地点：${mcpPlaces.join('、')}`)
+        if (toolSummary.length > 0) {
+          try {
+            const summaryResult = await generateText({
+              model: getLLM(),
+              messages: [
+                { role: 'user', content: userMessage },
+                { role: 'assistant', content: `我调用了以下工具获取信息：\n${toolSummary.join('\n')}` },
+                { role: 'user', content: '请根据以上工具查询结果，用中文给用户一个简洁有用的回复。直接回复用户，不要提及工具调用过程。' },
+              ],
+            })
+            finalText = summaryResult.text
+            logger.info('agent', `LLM summary generated: ${finalText.slice(0, 100)}`)
+          } catch (e) {
+            logger.error('agent', 'LLM summary failed', { error: String(e) })
+            finalText = '已处理您的请求。'
+          }
+        } else {
+          finalText = '已处理您的请求。'
         }
-
-        if (results.createdTripId) {
-          parts.push(`已创建行程「${results.createdTripTitle}」`)
-        }
-        if (results.modifiedTripId) {
-          parts.push(`已更新行程`)
-        }
-
-        finalText = parts.length > 0 ? parts.join('。') + '。' : '已处理您的请求。'
-        logger.warn('agent', 'Model returned empty text, generated fallback', { fallback: finalText.slice(0, 200) })
       }
       const metadata: StreamMetadata = {}
       if (reasoning) {
