@@ -12,6 +12,7 @@ interface MCPServer {
   client: Client
   tools: MCPTool[]
   connected: boolean
+  url: string
 }
 
 const servers: Record<string, MCPServer> = {}
@@ -36,13 +37,40 @@ async function connectServer(name: string, url: string) {
       inputSchema: t.inputSchema,
     }))
 
-    servers[name] = { client, tools, connected: true }
+    servers[name] = { client, tools, connected: true, url }
     logger.info('mcp', `Connected to ${name}`, {
       url,
       tools: tools.map(t => t.name),
     })
   } catch (error) {
     logger.error('mcp', `Failed to connect to ${name}`, { url, error: String(error) })
+  }
+}
+
+async function reconnectServer(name: string) {
+  const server = servers[name]
+  if (!server) return
+  logger.info('mcp', `Reconnecting to ${name}...`)
+  try {
+    // Close old client
+    try { await server.client.close() } catch {}
+    // Reconnect
+    const client = new Client({ name: `trip-agent-${name}`, version: '1.0.0' })
+    const transport = new StreamableHTTPClientTransport(new URL(server.url))
+    await client.connect(transport)
+
+    const toolsResult = await client.listTools()
+    const tools: MCPTool[] = (toolsResult.tools || []).map(t => ({
+      name: t.name,
+      description: t.description || '',
+      inputSchema: t.inputSchema,
+    }))
+
+    servers[name] = { client, tools, connected: true, url: server.url }
+    logger.info('mcp', `Reconnected to ${name}`, { tools: tools.map(t => t.name) })
+  } catch (error) {
+    logger.error('mcp', `Reconnect failed for ${name}`, { error: String(error) })
+    server.connected = false
   }
 }
 
@@ -68,8 +96,25 @@ export async function callMCPTool(toolName: string, args: Record<string, any>): 
       logger.agent.toolResult(`mcp:${toolName}`, result.content)
       return result.content
     } catch (error) {
-      logger.error('mcp', `Tool call failed: ${toolName}`, { error: String(error) })
-      return { error: String(error) }
+      const errStr = String(error)
+      // Auto-reconnect on session expired errors
+      if (errStr.includes('SessionExpired') || errStr.includes('session') || errStr.includes('expired')) {
+        logger.warn('mcp', `Session expired for ${serverName}, reconnecting...`)
+        await reconnectServer(serverName)
+        // Retry once after reconnect
+        if (servers[serverName]?.connected) {
+          try {
+            const retryResult = await servers[serverName].client.callTool({ name: toolName, arguments: args })
+            logger.agent.toolResult(`mcp:${toolName}`, retryResult.content)
+            return retryResult.content
+          } catch (retryError) {
+            logger.error('mcp', `Retry failed for ${toolName}`, { error: String(retryError) })
+            return { error: String(retryError) }
+          }
+        }
+      }
+      logger.error('mcp', `Tool call failed: ${toolName}`, { error: errStr })
+      return { error: errStr }
     }
   }
   return { error: `Tool ${toolName} not found in any MCP server` }
