@@ -89,7 +89,10 @@ export async function streamChatWithAgent(
   sessionId: string,
   userMessage: string,
   currentTripId?: string,
-) {
+): Promise<{ stream: any; metadataPromise: Promise<StreamMetadata> }> {
+  // Metadata will be resolved when onFinish fires
+  let resolveMetadata: (m: StreamMetadata) => void
+  const metadataPromise = new Promise<StreamMetadata>(r => { resolveMetadata = r })
   // 1. Save user message
   await agentRepository.createMessage(sessionId, 'user', userMessage)
 
@@ -214,8 +217,11 @@ export async function streamChatWithAgent(
 
       // Persist the final message + metadata to DB
       await agentRepository.createMessage(sessionId, 'assistant', text, metadata)
+
+      // Resolve the metadata promise so the controller can append it to the stream
+      resolveMetadata!(metadata)
     },
   })
 
-  return result
+  return { stream: result, metadataPromise }
 }

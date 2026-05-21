@@ -625,55 +625,51 @@ export const useTripStore = create<TripState>((set, get) => ({
         const chunk = decoder.decode(value, { stream: true })
         fullText += chunk
 
-        // Update the streaming message in real-time
+        // Update the streaming message in real-time (strip metadata line from display)
+        const displayText = fullText.replace(/\n__AGENT_META__\{.*\}$/, '')
         set(state => ({
           agentMessages: state.agentMessages.map(m =>
             m.id === assistantId
-              ? { ...m, content: fullText }
+              ? { ...m, content: displayText }
               : m
           ),
         }))
       }
 
-      // After stream completes, fetch the saved message to get metadata
-      try {
-        const msgsResponse = await axios.get(
-          `${API_BASE_URL}/agent/sessions/${activeAgentSessionId}/messages`,
-          { withCredentials: true }
-        )
-        const msgs = msgsResponse.data
-        // Find the last assistant message (should be the one we just streamed)
-        const lastAssistant = [...msgs].reverse().find((m: any) => m.role === 'assistant')
-        const metadata = lastAssistant?.metadata || {}
+      // Extract metadata appended by the server at the end of the stream
+      const metaMatch = fullText.match(/\n__AGENT_META__({.*})$/)
+      let metadata: Record<string, any> = {}
 
-        set(state => ({
-          agentMessages: state.agentMessages.map(m =>
-            m.id === assistantId
-              ? { ...m, content: fullText, metadata }
-              : m
-          ),
-          agentLoading: false,
-          agentSuggestedPlaces: metadata.suggestedPlaces || state.agentSuggestedPlaces,
-        }))
+      if (metaMatch) {
+        try {
+          metadata = JSON.parse(metaMatch[1])
+        } catch {
+          // Ignore parse errors
+        }
+      }
 
-        // If a trip was created, navigate to it
-        if (metadata.tripId) {
-          window.dispatchEvent(new CustomEvent('agent:navigateTrip', {
-            detail: { tripId: metadata.tripId }
-          }))
-        }
-        // If a trip was modified, refresh it
-        if (metadata.modifiedTripId) {
-          get().fetchTripById(metadata.modifiedTripId)
-        }
-      } catch {
-        // Metadata fetch failed, just use what we have
-        set(state => ({
-          agentMessages: state.agentMessages.map(m =>
-            m.id === assistantId ? { ...m, content: fullText } : m
-          ),
-          agentLoading: false,
+      // Clean display text (remove metadata line)
+      const cleanText = fullText.replace(/\n__AGENT_META__\{.*\}$/, '')
+
+      set(state => ({
+        agentMessages: state.agentMessages.map(m =>
+          m.id === assistantId
+            ? { ...m, content: cleanText, metadata }
+            : m
+        ),
+        agentLoading: false,
+        agentSuggestedPlaces: metadata.suggestedPlaces || state.agentSuggestedPlaces,
+      }))
+
+      // If a trip was created, navigate to it
+      if (metadata.tripId) {
+        window.dispatchEvent(new CustomEvent('agent:navigateTrip', {
+          detail: { tripId: metadata.tripId }
         }))
+      }
+      // If a trip was modified, refresh it immediately
+      if (metadata.modifiedTripId) {
+        get().fetchTripById(metadata.modifiedTripId)
       }
     } catch (error) {
       console.error('Failed to send agent message:', error)

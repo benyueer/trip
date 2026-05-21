@@ -88,10 +88,10 @@ export const chat = async (req: Request, res: Response) => {
     // Trip-related: stream the agent response via SSE
     logger.agent.streamStart(sessionId)
     const startTime = Date.now()
-    const result = await streamChatWithAgent(req.user!.id, sessionId, content, currentTripId)
+    const { stream, metadataPromise } = await streamChatWithAgent(req.user!.id, sessionId, content, currentTripId)
 
     // Pipe the AI SDK stream directly to the HTTP response as SSE
-    const streamResponse = result.toTextStreamResponse()
+    const streamResponse = stream.toTextStreamResponse()
     const reader = streamResponse.body!.getReader()
 
     res.setHeader('Content-Type', 'text/event-stream')
@@ -106,10 +106,16 @@ export const chat = async (req: Request, res: Response) => {
         res.write(value)
         totalChars += value.length
       }
-      res.end()
     }
 
     await pump()
+
+    // Wait for onFinish to complete and append metadata to the stream
+    const metadata = await metadataPromise
+    const metaLine = `\n__AGENT_META__${JSON.stringify(metadata)}`
+    res.write(metaLine)
+    res.end()
+
     const elapsed = Date.now() - startTime
     logger.agent.streamEnd(sessionId, totalChars)
     logger.info('agent', `Chat completed in ${elapsed}ms`, { sessionId: sessionId.slice(0, 8), chars: totalChars })
