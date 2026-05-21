@@ -81,12 +81,12 @@ const SYSTEM_PROMPT = `你是一个专业的旅行规划助手。你的职责是
 - 拿到地点名称后，必须使用 mcp_maps_text_search 等高德 MCP 工具获取真实的经纬度、地址等地理信息
 - 推荐给用户的地点必须来自高德 MCP 的可信数据（有真实坐标），不要使用 webSearch 的原始结果作为地点数据
 
-单天规划流程：
-- 当用户要求规划某一天的行程时（如"规划day2的千岛湖旅行"），使用 planDayRoute 工具生成方案
-- planDayRoute 只生成备选方案，不会直接创建行程，用户需要确认后才生效
-- 规划时先用 webSearch 搜索目的地信息获取地点名称，再用高德 MCP 获取每个地点的真实坐标
-- 给出合理的路线顺序，考虑地理位置就近原则
-- 回复时说明规划思路，并提示用户可以接受或拒绝方案`
+单天规划流程（必须严格按步骤执行）：
+1. 当用户要求规划某一天的行程时（如"规划day2的千岛湖旅行"），先用 webSearch 或 mcp_maps_text_search 搜索景点
+2. 用 mcp_maps_search_detail 获取每个景点的详细信息和真实坐标
+3. 最后必须调用 planDayRoute 工具，把搜索到的景点打包成方案，传入真实经纬度
+4. 不要只搜索就结束，planDayRoute 是必须调用的最终步骤
+5. 回复时说明规划思路，并提示用户可以接受或拒绝方案`
 
 export interface StreamMetadata {
   suggestedPlaces?: any[]
@@ -232,6 +232,59 @@ export async function streamChatWithAgent(
       let finalText = text
       if (!finalText || !finalText.trim()) {
         logger.warn('agent', 'Model returned empty text, requesting summary from LLM')
+
+        // Auto-construct dayPlan from MCP results if model searched but didn't call planDayRoute
+        if (!results.dayPlan && results._mcpCalls && results._mcpCalls.length > 0) {
+          const placesFromMCP: Array<{
+            name: string; lngLat: [number, number]; description: string;
+            category: string; address: string; rating: string; ticket: string;
+            openingHours: string; order: number;
+          }> = []
+          const seenNames = new Set<string>()
+
+          for (const call of results._mcpCalls) {
+            if (!call.toolName.includes('search_detail')) continue
+            const content = Array.isArray(call.result) ? call.result : []
+            for (const item of content) {
+              if (item.type !== 'text' || !item.text) continue
+              try {
+                const data = JSON.parse(item.text)
+                if (data.name && data.location && !seenNames.has(data.name)) {
+                  seenNames.add(data.name)
+                  const [lng, lat] = data.location.split(',').map(Number)
+                  placesFromMCP.push({
+                    name: data.name,
+                    lngLat: [lng, lat],
+                    description: data.address || '',
+                    category: data.type || '',
+                    address: data.address || '',
+                    rating: data.biz_ext?.rating || '',
+                    ticket: data.biz_ext?.cost || '',
+                    openingHours: data.biz_ext?.open_time || '',
+                    order: placesFromMCP.length + 1,
+                  })
+                }
+              } catch {}
+            }
+          }
+
+          // If we found 2+ places, construct a dayPlan automatically
+          if (placesFromMCP.length >= 2) {
+            // Extract dayIndex from user message
+            const dayMatch = userMessage.match(/day\s*(\d+)/i) || userMessage.match(/第(\d+)天/)
+            const dayIndex = dayMatch ? parseInt(dayMatch[1]) : 1
+
+            const dayPlan = {
+              dayIndex,
+              title: `第${dayIndex}天行程`,
+              description: '',
+              places: placesFromMCP,
+            }
+            toolResultStore.dayPlan = dayPlan
+            results.dayPlan = dayPlan
+            logger.info('agent', `Auto-constructed dayPlan from MCP results: ${placesFromMCP.length} places`)
+          }
+        }
 
         // Build a summary prompt from tool results
         const toolSummary: string[] = []
