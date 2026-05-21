@@ -185,9 +185,9 @@ export async function streamChatWithAgent(
     const zodShape: Record<string, any> = {}
     for (const [key, prop] of Object.entries(properties) as [string, any][]) {
       let field: any = prop.type === 'string' ? z.string() :
-                       prop.type === 'number' ? z.number() :
-                       prop.type === 'boolean' ? z.boolean() :
-                       z.any()
+        prop.type === 'number' ? z.number() :
+          prop.type === 'boolean' ? z.boolean() :
+            z.any()
       if (prop.description) field = field.describe(prop.description)
       if (!required.has(key)) field = field.optional()
       zodShape[key] = field
@@ -197,7 +197,11 @@ export async function streamChatWithAgent(
       inputSchema: z.object(zodShape),
       execute: async (args: any) => {
         logger.agent.toolCall(toolName, args)
-        return await callMCPTool(mcpTool.name, args)
+        const result = await callMCPTool(mcpTool.name, args)
+        // Track MCP tool calls for fallback text generation
+        if (!toolResultStore._mcpCalls) toolResultStore._mcpCalls = []
+        toolResultStore._mcpCalls.push({ toolName, args, result })
+        return result
       },
     })
   }
@@ -226,6 +230,9 @@ export async function streamChatWithAgent(
       let finalText = text
       if (!finalText || !finalText.trim()) {
         const parts: string[] = []
+        if (results.dayPlan) {
+          parts.push(`已为您规划「${results.dayPlan.title}」，包含 ${results.dayPlan.places.length} 个地点，请查看下方方案卡片。`)
+        }
         if (results.suggestedPlaces && results.suggestedPlaces.length > 0) {
           parts.push(`为您找到 ${results.suggestedPlaces.length} 个相关地点：${results.suggestedPlaces.map((p: any) => p.name).join('、')}`)
         }
@@ -234,6 +241,14 @@ export async function streamChatWithAgent(
         }
         if (results.modifiedTripId) {
           parts.push(`已更新行程`)
+        }
+        // Check MCP tool calls
+        if (results._mcpCalls && results._mcpCalls.length > 0) {
+          const mcpSummary = results._mcpCalls
+            .map((c: any) => c.toolName.replace('mcp_maps_', ''))
+            .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+            .join('、')
+          if (mcpSummary) parts.push(`已通过高德地图查询了${mcpSummary}等信息`)
         }
         finalText = parts.length > 0 ? parts.join('。') + '。' : '已处理您的请求。'
         logger.warn('agent', 'Model returned empty text, generated fallback', { fallback: finalText })

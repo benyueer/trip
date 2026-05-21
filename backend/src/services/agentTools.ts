@@ -9,6 +9,7 @@ import { logger } from './logger'
 // Uses a runId to isolate results between concurrent message processing
 export const toolResultStore = {
   runId: '',
+  _mcpCalls: null as null | Array<{ toolName: string; args: any; result: any }>,
   suggestedPlaces: null as any[] | null,
   createdTripId: null as string | null,
   createdTripTitle: null as string | null,
@@ -36,6 +37,7 @@ export const toolResultStore = {
   } | null,
   reset(runId: string) {
     this.runId = runId
+    this._mcpCalls = null
     this.suggestedPlaces = null
     this.createdTripId = null
     this.createdTripTitle = null
@@ -47,6 +49,7 @@ export const toolResultStore = {
     // Only return results if they belong to this run
     if (this.runId !== runId) return {}
     return {
+      _mcpCalls: this._mcpCalls,
       suggestedPlaces: this.suggestedPlaces,
       createdTripId: this.createdTripId,
       createdTripTitle: this.createdTripTitle,
