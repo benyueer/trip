@@ -88,13 +88,15 @@ const TripDetailPage: React.FC = () => {
         <h1 className='text-lg font-bold text-gray-900'>{currentTrip.title}</h1>
       </div>
 
-      <button
-        onClick={() => setAgentPanelOpen(!isAgentPanelOpen)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group z-30 animate-pulse"
-        style={{ animationDuration: '3s' }}
-      >
-        <Bot className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
-      </button>
+      {!isAgentPanelOpen && (
+        <button
+          onClick={() => setAgentPanelOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group z-30 animate-pulse"
+          style={{ animationDuration: '3s' }}
+        >
+          <Bot className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
+        </button>
+      )}
     </div>
   )
 }
