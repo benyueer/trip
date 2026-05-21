@@ -502,9 +502,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     set({ user: null, isAuthenticated: false, currentTrip: null, trips: [] })
   },
 
-  // Agent state
+  // Agent state — restore last active session from localStorage
   agentSessions: [],
-  activeAgentSessionId: null,
+  activeAgentSessionId: localStorage.getItem('agent_active_session_id'),
   agentMessages: [],
   agentSuggestedPlaces: null,
   agentLoading: false,
@@ -534,6 +534,9 @@ export const useTripStore = create<TripState>((set, get) => ({
   deleteAgentSession: async (id) => {
     try {
       await axios.delete(`${API_BASE_URL}/agent/sessions/${id}`, { withCredentials: true })
+      if (localStorage.getItem('agent_active_session_id') === id) {
+        localStorage.removeItem('agent_active_session_id')
+      }
       set(state => ({
         agentSessions: state.agentSessions.filter(s => s.id !== id),
         activeAgentSessionId: state.activeAgentSessionId === id ? null : state.activeAgentSessionId,
@@ -545,6 +548,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   setActiveAgentSession: async (id) => {
+    localStorage.setItem('agent_active_session_id', id)
     set({ activeAgentSessionId: id, agentMessages: [], agentSuggestedPlaces: null })
     try {
       const response = await axios.get(`${API_BASE_URL}/agent/sessions/${id}/messages`, { withCredentials: true })
