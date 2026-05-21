@@ -65,7 +65,7 @@ export const queryLocalPlaces = tool({
   },
 })
 
-// Tool 2: Web search (DuckDuckGo — free, no API key)
+// Tool 2: Web search (DuckDuckGo Lite — free, no API key)
 export const webSearch = tool({
   description: 'Search the web for latest travel information, recommendations, and destination details. Use when local data is insufficient.',
   inputSchema: z.object({
@@ -73,16 +73,39 @@ export const webSearch = tool({
   }),
   execute: async ({ query }) => {
     try {
-      const ddg = require('duckduckgo-search')
-      const results: any[] = []
-      for await (const r of ddg.text(query, { safeSearch: 'moderate', maxResults: 5 })) {
-        results.push({
-          title: r.title,
-          snippet: (r.description || r.body || '').slice(0, 200),
-          url: r.url || r.href || '',
-        })
-        if (results.length >= 5) break
+      const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+      })
+      const html = await response.text()
+
+      // Parse results from DuckDuckGo Lite HTML
+      const results: { title: string; snippet: string; url: string }[] = []
+      const linkRegex = /<a[^>]+class="result-link"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi
+      const snippetRegex = /<td[^>]*class="result-snippet"[^>]*>([\s\S]*?)<\/td>/gi
+
+      let linkMatch
+      const links: { url: string; title: string }[] = []
+      while ((linkMatch = linkRegex.exec(html)) !== null) {
+        links.push({ url: linkMatch[1], title: linkMatch[2].trim() })
       }
+
+      let snippetMatch
+      const snippets: string[] = []
+      while ((snippetMatch = snippetRegex.exec(html)) !== null) {
+        snippets.push(snippetMatch[1].replace(/<[^>]*>/g, '').trim())
+      }
+
+      for (let i = 0; i < Math.min(links.length, 5); i++) {
+        results.push({
+          title: links[i].title,
+          snippet: (snippets[i] || '').slice(0, 200),
+          url: links[i].url,
+        })
+      }
+
       return {
         answer: results.length > 0 ? `Found ${results.length} results for "${query}"` : 'No results found',
         results,
