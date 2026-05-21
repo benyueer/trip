@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { agentRepository } from '../repositories/AgentRepository'
 import { queryLocalPlaces, webSearch, saveUserMemory, createTripPlan, modifyTripPlan, planDayRoute, toolResultStore } from './agentTools'
 import { logger } from './logger'
+import { calculateRoutesBetweenPlaces } from './routeCalculator'
 import { getMCPTools, callMCPTool } from './mcpClient'
 import { z } from 'zod'
 
@@ -274,16 +275,19 @@ export async function streamChatWithAgent(
             const dayMatch = userMessage.match(/day\s*(\d+)/i) || userMessage.match(/第(\d+)天/)
             const dayIndex = dayMatch ? parseInt(dayMatch[1]) : 1
 
+            // Calculate routes between consecutive places
+            const routes = await calculateRoutesBetweenPlaces(placesFromMCP)
+
             const dayPlan = {
               dayIndex,
               title: `第${dayIndex}天行程`,
               description: '',
               places: placesFromMCP,
-              routes: [],
+              routes,
             }
             toolResultStore.dayPlan = dayPlan
             results.dayPlan = dayPlan
-            logger.info('agent', `Auto-constructed dayPlan from MCP results: ${placesFromMCP.length} places`)
+            logger.info('agent', `Auto-constructed dayPlan from MCP results: ${placesFromMCP.length} places, ${routes.length} routes`)
           }
         }
 
