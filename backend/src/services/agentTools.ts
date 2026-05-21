@@ -121,8 +121,10 @@ export const createTripPlan = tool({
   inputSchema: z.object({
     userId: z.string().describe('The user ID'),
     title: z.string().describe('Trip title, e.g. "伊犁三日游"'),
+    description: z.string().optional().describe('Trip theme/description, e.g. "体验海滩风光"'),
     days: z.array(z.object({
       dayIndex: z.number(),
+      description: z.string().optional().describe('Day theme, e.g. "青岛的海"'),
       items: z.array(z.object({
         name: z.string(),
         lngLat: z.array(z.number()).describe('[longitude, latitude]'),
@@ -135,11 +137,13 @@ export const createTripPlan = tool({
       })),
     })).describe('Array of day plans, each with ordered places'),
   }),
-  execute: async ({ userId, title, days }) => {
+  execute: async ({ userId, title, description, days }) => {
     const tripData = {
       title,
+      description: description || '',
       days: days.map(day => ({
         dayIndex: day.dayIndex,
+        description: day.description || '',
         items: day.items.map(item => ({
           id: crypto.randomUUID(),
           type: 'place',

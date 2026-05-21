@@ -15,6 +15,7 @@ export const users = pgTable('User', {
 export const trips = pgTable('Trip', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: text('title').notNull(),
+  description: text('description').default(''),
   ownerId: uuid('ownerId').references(() => users.id),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),
@@ -23,6 +24,7 @@ export const trips = pgTable('Trip', {
 export const days = pgTable('Day', {
   id: uuid('id').primaryKey().defaultRandom(),
   dayIndex: integer('dayIndex').notNull(),
+  description: text('description').default(''),
   tripId: uuid('tripId')
     .notNull()
     .references(() => trips.id, { onDelete: 'cascade' })

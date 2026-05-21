@@ -334,7 +334,7 @@ export default function FloatingPanel() {
       <div className='absolute right-4 top-4 bottom-4 w-96 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 overflow-hidden flex flex-col z-10 transition-all duration-300'>
         {/* 头部 */}
         <div className='p-5 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl z-20 flex justify-between items-start'>
-          <div>
+          <div className='flex-1 min-w-0'>
             <h1 className='text-2xl font-black bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent'>行程详情</h1>
             <div className='flex items-center gap-2 mt-1'>
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isEditMode ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
@@ -363,6 +363,9 @@ export default function FloatingPanel() {
                 )}
               </div>
             )}
+            {currentTrip?.description && (
+              <p className='text-xs text-gray-400 mt-2 line-clamp-2'>{currentTrip.description}</p>
+            )}
           </div>
           <button
             onClick={() => addDay()}
@@ -374,18 +377,23 @@ export default function FloatingPanel() {
         </div>
 
         {/* Day Tab 栏（也是拖拽放置区） */}
-        <div className='px-4 py-3 bg-gray-50/50 border-b border-gray-100/50 overflow-x-auto no-scrollbar flex gap-2'>
-          {days.map(day => (
-            <DroppableDayTab
-              key={day.dayIndex}
-              dayIndex={day.dayIndex}
-              isActive={activeDayIndex === day.dayIndex}
-              canDelete={days.length > 1}
-              isDragging={isDragging}
-              onActivate={() => setActiveDayIndex(day.dayIndex)}
-              onDelete={() => { if (confirm(`确定要删除第 ${day.dayIndex} 天吗？`)) deleteDay(day.dayIndex) }}
-            />
-          ))}
+        <div className='px-4 py-3 bg-gray-50/50 border-b border-gray-100/50 overflow-x-auto no-scrollbar'>
+          <div className='flex gap-2'>
+            {days.map(day => (
+              <DroppableDayTab
+                key={day.dayIndex}
+                dayIndex={day.dayIndex}
+                isActive={activeDayIndex === day.dayIndex}
+                canDelete={days.length > 1}
+                isDragging={isDragging}
+                onActivate={() => setActiveDayIndex(day.dayIndex)}
+                onDelete={() => { if (confirm(`确定要删除第 ${day.dayIndex} 天吗？`)) deleteDay(day.dayIndex) }}
+              />
+            ))}
+          </div>
+          {activeDay?.description && (
+            <p className='text-xs text-gray-400 mt-1.5 px-1'>{activeDay.description}</p>
+          )}
         </div>
 
         {/* 行程内容列表 */}

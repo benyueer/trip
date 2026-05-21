@@ -143,10 +143,14 @@ export async function streamChatWithAgent(
     const trip = await tripRepository.findById(currentTripId)
     if (trip) {
       systemPrompt += `\n\n当前正在编辑的行程: "${trip.title}" (ID: ${currentTripId})`
+      if ((trip as any).description) {
+        systemPrompt += `\n行程主题: ${(trip as any).description}`
+      }
       systemPrompt += `\n行程包含 ${trip.days.length} 天:`
       for (const day of trip.days) {
         const placeNames = day.items.filter(i => i.type === 'place').map(i => i.name)
-        systemPrompt += `\n  第${day.dayIndex}天: ${placeNames.join(' → ')}`
+        const dayDesc = (day as any).description ? ` (${(day as any).description})` : ''
+        systemPrompt += `\n  第${day.dayIndex}天${dayDesc}: ${placeNames.join(' → ')}`
       }
     }
   }

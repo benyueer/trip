@@ -65,6 +65,7 @@ export class TripRepository {
     return db.transaction(async (tx) => {
       const [newTrip] = await tx.insert(trips).values({
         title: data.title,
+        description: data.description || '',
         ownerId: ownerId || null,
       }).returning()
 
@@ -72,6 +73,7 @@ export class TripRepository {
         for (const dayData of data.days) {
           const [newDay] = await tx.insert(days).values({
             dayIndex: dayData.dayIndex,
+            description: dayData.description || '',
             tripId: newTrip.id,
           }).returning()
 
@@ -118,7 +120,7 @@ export class TripRepository {
   async update(id: string, data: any) {
     return db.transaction(async (tx) => {
       await tx.update(trips)
-        .set({ title: data.title, updatedAt: new Date() })
+        .set({ title: data.title, description: data.description || '', updatedAt: new Date() })
         .where(eq(trips.id, id))
 
       await tx.delete(days).where(eq(days.tripId, id))
@@ -127,6 +129,7 @@ export class TripRepository {
         for (const dayData of data.days) {
           const [newDay] = await tx.insert(days).values({
             dayIndex: dayData.dayIndex,
+            description: dayData.description || '',
             tripId: id,
           }).returning()
 

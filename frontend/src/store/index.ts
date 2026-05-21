@@ -34,12 +34,14 @@ export type TripItem = Place | Route
 export interface DayPlan {
   id?: string
   dayIndex: number
+  description?: string
   items: TripItem[]
 }
 
 export interface Trip {
   id: string
   title: string
+  description?: string
   createdAt: string
   updatedAt: string
   days: DayPlan[]

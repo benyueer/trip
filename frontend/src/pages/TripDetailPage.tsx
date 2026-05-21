@@ -84,8 +84,11 @@ const TripDetailPage: React.FC = () => {
         onClose={() => setShowShareModal(false)}
       />
 
-      <div className='absolute top-6 left-24 z-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-white'>
+      <div className='absolute top-6 left-24 z-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-white max-w-sm'>
         <h1 className='text-lg font-bold text-gray-900'>{currentTrip.title}</h1>
+        {currentTrip.description && (
+          <p className='text-xs text-gray-500 mt-0.5 truncate'>{currentTrip.description}</p>
+        )}
       </div>
 
       {!isAgentPanelOpen && (
