@@ -230,28 +230,46 @@ export async function streamChatWithAgent(
       let finalText = text
       if (!finalText || !finalText.trim()) {
         const parts: string[] = []
+
+        // Extract place names from MCP text search results
+        const mcpPlaces: string[] = []
+        if (results._mcpCalls) {
+          for (const call of results._mcpCalls) {
+            if (call.toolName.includes('text_search') && call.result) {
+              const content = Array.isArray(call.result) ? call.result : []
+              for (const item of content) {
+                if (item.type === 'text' && item.text) {
+                  try {
+                    const data = JSON.parse(item.text)
+                    if (data.pois) {
+                      for (const poi of data.pois.slice(0, 5)) {
+                        if (poi.name) mcpPlaces.push(poi.name)
+                      }
+                    }
+                  } catch {}
+                }
+              }
+            }
+          }
+        }
+
         if (results.dayPlan) {
-          parts.push(`已为您规划「${results.dayPlan.title}」，包含 ${results.dayPlan.places.length} 个地点，请查看下方方案卡片。`)
-        }
-        if (results.suggestedPlaces && results.suggestedPlaces.length > 0) {
+          parts.push(`已为您规划「${results.dayPlan.title}」，包含 ${results.dayPlan.places.length} 个地点：${results.dayPlan.places.map((p: any) => p.name).join('→')}，请查看下方方案卡片，可以接受或重新规划。`)
+        } else if (results.suggestedPlaces && results.suggestedPlaces.length > 0) {
           parts.push(`为您找到 ${results.suggestedPlaces.length} 个相关地点：${results.suggestedPlaces.map((p: any) => p.name).join('、')}`)
+        } else if (mcpPlaces.length > 0) {
+          parts.push(`为您找到以下相关地点：${mcpPlaces.join('、')}`)
         }
+
         if (results.createdTripId) {
           parts.push(`已创建行程「${results.createdTripTitle}」`)
         }
         if (results.modifiedTripId) {
           parts.push(`已更新行程`)
         }
-        // Check MCP tool calls
-        if (results._mcpCalls && results._mcpCalls.length > 0) {
-          const mcpSummary = results._mcpCalls
-            .map((c: any) => c.toolName.replace('mcp_maps_', ''))
-            .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
-            .join('、')
-          if (mcpSummary) parts.push(`已通过高德地图查询了${mcpSummary}等信息`)
-        }
+
         finalText = parts.length > 0 ? parts.join('。') + '。' : '已处理您的请求。'
-        logger.warn('agent', 'Model returned empty text, generated fallback', { fallback: finalText })
+        logger.warn('agent', 'Model returned empty text, generated fallback', { fallback: finalText.slice(0, 200) })
       }
       const metadata: StreamMetadata = {}
       if (reasoning) {
