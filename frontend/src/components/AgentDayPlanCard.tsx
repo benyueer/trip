@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { MapPin, Check, X, Clock, Navigation } from 'lucide-react'
 import { useTripStore } from '../store'
@@ -24,6 +24,11 @@ interface DayPlan {
     totalDistance: string
     totalDuration: string
   }
+  routes?: Array<{
+    distance: string
+    duration: string
+    path: [number, number][]
+  }>
 }
 
 interface Props {
@@ -64,14 +69,54 @@ export function AgentDayPlanCard({ plan, onAccept, onReject }: Props) {
       })
     }
     updateCurrentTrip({ days: newDays })
+    useTripStore.getState().setAgentPlanRoutes(null)
+    useTripStore.setState({ agentSuggestedPlaces: null })
     setStatus('accepted')
     onAccept?.()
   }
 
   const handleReject = () => {
+    useTripStore.getState().setAgentPlanRoutes(null)
+    useTripStore.setState({ agentSuggestedPlaces: null })
     setStatus('rejected')
     onReject?.()
   }
+
+  // Sync plan places and routes to map on mount
+  useEffect(() => {
+    // Set suggested places for map markers
+    useTripStore.setState({
+      agentSuggestedPlaces: plan.places.map(p => ({
+        name: p.name,
+        lngLat: p.lngLat,
+        description: p.description,
+        category: p.category,
+        address: p.address,
+        rating: p.rating,
+        ticket: p.ticket,
+        openingHours: p.openingHours,
+      }))
+    })
+
+    // Set plan routes for map polylines
+    if (plan.routes && plan.routes.length > 0) {
+      useTripStore.getState().setAgentPlanRoutes(plan.routes)
+    }
+
+    // Fit map to show all places
+    if (plan.places.length > 0) {
+      const allLngLats = plan.places.map(p => p.lngLat)
+      window.dispatchEvent(new CustomEvent('agent:fitPlanView', {
+        detail: { lngLats: allLngLats }
+      }))
+    }
+
+    // Cleanup on unmount
+    return () => {
+      useTripStore.getState().setAgentPlanRoutes(null)
+      useTripStore.setState({ agentSuggestedPlaces: null })
+    }
+  }, [plan])
 
   return (
     <motion.div
