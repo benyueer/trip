@@ -545,6 +545,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   agentLoading: false,
   isAgentPanelOpen: false,
   agentPlanRoutes: null,
+  agentIntent: null as string | null,
 
   fetchAgentSessions: async () => {
     try {
@@ -714,6 +715,7 @@ export const useTripStore = create<TripState>((set, get) => ({
         ),
         agentLoading: false,
         agentSuggestedPlaces: metadata.suggestedPlaces || state.agentSuggestedPlaces,
+        agentIntent: metadata.intent || state.agentIntent,
       }))
 
       if (metadata.tripId) {
