@@ -10,10 +10,17 @@ declare global {
 }
 
 function toLngLat(val: any): [number, number] {
-  if (Array.isArray(val)) return val as [number, number]
-  if (typeof val === 'string') {
+  let result: [number, number] | null = null
+  if (Array.isArray(val) && val.length >= 2) {
+    result = [Number(val[0]), Number(val[1])]
+  } else if (typeof val === 'string') {
     const parts = val.split(',')
-    if (parts.length === 2) return [parseFloat(parts[0]), parseFloat(parts[1])]
+    if (parts.length === 2) {
+      result = [parseFloat(parts[0]), parseFloat(parts[1])]
+    }
+  }
+  if (result && Number.isFinite(result[0]) && Number.isFinite(result[1])) {
+    return result
   }
   return [120.155, 30.27]
 }
