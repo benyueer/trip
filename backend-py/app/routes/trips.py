@@ -271,6 +271,12 @@ async def update_trip(
     trip.updatedAt = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).replace(tzinfo=None)
 
     if "days" in data:
+        # Delete items first to avoid FK violation
+        existing_days = (await db_session.execute(
+            select(Day.id).where(Day.tripId == trip_id)
+        )).scalars().all()
+        if existing_days:
+            await db_session.execute(sa_delete(Item).where(Item.dayId.in_(existing_days)))
         await db_session.execute(sa_delete(Day).where(Day.tripId == trip_id))
 
         for day_data in data["days"]:
@@ -287,7 +293,7 @@ async def update_trip(
                     id=item_data.get("id"),
                     type=item_data.get("type", "place"),
                     name=item_data.get("name", ""),
-                    lngLat=item_data.get("lngLat", json.dumps(item_data.get("lngLat", []))),
+                    lngLat=json.dumps(_parse_lnglat(item_data.get("lngLat", []))),
                     distance=item_data.get("distance"),
                     duration=item_data.get("duration"),
                     path=json.dumps(item_data.get("path")) if item_data.get("path") else None,
