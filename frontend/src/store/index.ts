@@ -650,7 +650,8 @@ export const useTripStore = create<TripState>((set, get) => ({
       }
 
       // Structured event stream — parse newline-delimited JSON
-      const reader = response.body!.getReader()
+      if (!response.body) throw new Error('Response body is empty')
+      const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
       let textContent = ''
@@ -686,6 +687,8 @@ export const useTripStore = create<TripState>((set, get) => ({
             if (step) {
               step.status = 'done'
               step.output = event.output
+            } else {
+              toolSteps.push({ tool: event.tool, toolCallId: event.toolCallId, status: 'done', output: event.output })
             }
           } else if (event.type === 'meta') {
             metadata = event.data || {}

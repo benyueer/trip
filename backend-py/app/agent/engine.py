@@ -122,81 +122,6 @@ def _history_to_langchain(history: list[AgentMessage]) -> list:
     return msgs
 
 
-def _lc_message_to_openai(msg: Any) -> dict:
-    """Convert a LangChain BaseMessage to an OpenAI API dict."""
-    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-
-    def _content_str(c: Any) -> str:
-        if isinstance(c, list):
-            return json.dumps(c, ensure_ascii=False)
-        return str(c) if c is not None else ""
-
-    if isinstance(msg, SystemMessage):
-        return {"role": "system", "content": _content_str(msg.content)}
-    if isinstance(msg, HumanMessage):
-        return {"role": "user", "content": _content_str(msg.content)}
-    if isinstance(msg, AIMessage):
-        d: dict = {"role": "assistant", "content": _content_str(msg.content)}
-        if msg.tool_calls:
-            d["tool_calls"] = [
-                {"id": tc["id"], "type": "function", "function": {"name": tc["name"], "arguments": json.dumps(tc["args"], ensure_ascii=False)}}
-                for tc in msg.tool_calls
-            ]
-        return d
-    if isinstance(msg, ToolMessage):
-        return {"role": "tool", "content": _content_str(msg.content), "tool_call_id": msg.tool_call_id}
-    c = msg.content
-    if isinstance(c, list):
-        c = json.dumps(c, ensure_ascii=False)
-    return {"role": "user", "content": str(c)}
-
-
-async def _get_reasoning_content(input_messages: list, llm: ChatOpenAI) -> str:
-    """Re-call the LLM (non-streaming) to extract reasoning_content from the raw response.
-
-    LangChain's ChatOpenAI deliberately drops the `reasoning_content` field from
-    DeepSeek-style streaming deltas (see _convert_delta_to_message_chunk in base.py:587).
-    We make an identical non-streaming call and read the raw JSON to capture it.
-    """
-    import httpx
-
-    from langchain_core.messages import BaseMessage
-
-    flat: list = []
-    for m in input_messages:
-        if isinstance(m, list):
-            flat.extend(m)
-        else:
-            flat.append(m)
-    api_messages = []
-    for m in flat:
-        if isinstance(m, BaseMessage):
-            api_messages.append(_lc_message_to_openai(m))
-        elif isinstance(m, dict):
-            api_messages.append(m)
-        else:
-            api_messages.append({"role": "user", "content": str(m)})
-    payload = {
-        "model": llm.model,
-        "messages": api_messages,
-        "stream": False,
-    }
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{llm.openai_api_base}/chat/completions",
-                headers={"Authorization": f"Bearer {llm.openai_api_key}"},
-                json=payload,
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-        reasoning = data.get("choices", [{}])[0].get("message", {}).get("reasoning_content", "")
-        return reasoning or ""
-    except Exception as e:
-        logger.warn("agent", "Failed to get reasoning_content", {"error": str(e)})
-        return ""
-
 
 def _extract_metadata(tool_results: list[Any]) -> dict:
     """Extract frontend-facing metadata from tool call response values."""
@@ -274,7 +199,6 @@ async def stream_chat_with_agent(
         )
 
         langchain_messages = _history_to_langchain(history)
-        langchain_messages.append(HumanMessage(content=user_message))
 
         token_buffer: list[str] = []
         tool_results_buffer: list[Any] = []
@@ -321,13 +245,11 @@ async def stream_chat_with_agent(
         final_text = "".join(token_buffer) or "已处理您的请求。"
         metadata = _extract_metadata(tool_results_buffer)
 
-        meta = metadata.copy()
-
         db_session.add(AgentMessage(
             sessionId=session_id,
             role="assistant",
             content=final_text,
-            meta=json.dumps(meta, ensure_ascii=False) if meta else None,
+            meta=json.dumps(metadata, ensure_ascii=False) if metadata else None,
         ))
         sess.updatedAt = datetime.now(timezone.utc).replace(tzinfo=None)
         await db_session.commit()

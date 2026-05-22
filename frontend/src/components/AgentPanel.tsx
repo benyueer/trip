@@ -294,7 +294,7 @@ export function AgentPanel() {
                   </div>
                 ))}
 
-                {agentLoading && !agentMessages.some(m => m.role === 'assistant' && m.content) && (
+                {agentLoading && !agentMessages.some(m => m.role === 'assistant' && (m.content || m.toolSteps?.length)) && (
                   <div className="flex gap-3">
                     <div className="w-7 h-7 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
                       <Bot className="w-3.5 h-3.5 text-gray-600" />
