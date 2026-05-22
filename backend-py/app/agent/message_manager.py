@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select, desc
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AgentMessage, AgentSession
+from app.models import AgentMessage, AgentSession, _utcnow
 
 
 class MessageManager:
@@ -53,11 +52,11 @@ class MessageManager:
         result = await self.db.execute(
             select(AgentMessage)
             .where(AgentMessage.sessionId == session_id)
-            .order_by(AgentMessage.createdAt.asc())
+            .order_by(AgentMessage.createdAt.desc())
+            .limit(limit)
         )
-        all_messages = result.scalars().all()
-        return all_messages[-limit:]
+        return list(reversed(result.scalars().all()))
 
     async def touch_session(self, session: AgentSession) -> None:
-        session.updatedAt = datetime.now(timezone.utc).replace(tzinfo=None)
+        session.updatedAt = _utcnow()
         await self.db.flush()
