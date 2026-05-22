@@ -54,44 +54,48 @@ async def handle_place_search(
     token_buffer: list[str] = []
     tool_results_buffer: list[Any] = []
 
-    async for event in agent.astream_events(
-        {"messages": langchain_messages},
-        version="v2",
-        config={"recursion_limit": 30},
-    ):
-        kind = event["event"]
+    try:
+        async for event in agent.astream_events(
+            {"messages": langchain_messages},
+            version="v2",
+            config={"recursion_limit": 30},
+        ):
+            kind = event["event"]
 
-        if kind == "on_chat_model_stream":
-            chunk = event["data"]["chunk"]
-            if chunk.content:
-                token_buffer.append(chunk.content)
-                yield json.dumps({"type": "token", "content": chunk.content}, ensure_ascii=False) + "\n"
+            if kind == "on_chat_model_stream":
+                chunk = event["data"]["chunk"]
+                if chunk.content:
+                    token_buffer.append(chunk.content)
+                    yield json.dumps({"type": "token", "content": chunk.content}, ensure_ascii=False) + "\n"
 
-        elif kind == "on_tool_start":
-            tool_name = event.get("name", "unknown")
-            tool_input = event.get("data", {}).get("input", {})
-            tool_call_id = event.get("run_id", "")
-            logger.agent.tool_call(tool_name, tool_input)
-            yield json.dumps({
-                "type": "tool_start",
-                "tool": tool_name,
-                "input": tool_input,
-                "toolCallId": tool_call_id,
-            }, ensure_ascii=False) + "\n"
-
-        elif kind == "on_tool_end":
-            output = event.get("data", {}).get("output", "")
-            tool_name = event.get("name", "unknown")
-            tool_call_id = event.get("run_id", "")
-            if output is not None:
-                tool_results_buffer.append(output)
-                output_str = _stringify_output(output)
+            elif kind == "on_tool_start":
+                tool_name = event.get("name", "unknown")
+                tool_input = event.get("data", {}).get("input", {})
+                tool_call_id = event.get("run_id", "")
+                logger.agent.tool_call(tool_name, tool_input)
                 yield json.dumps({
-                    "type": "tool_end",
+                    "type": "tool_start",
                     "tool": tool_name,
+                    "input": tool_input,
                     "toolCallId": tool_call_id,
-                    "output": output_str,
                 }, ensure_ascii=False) + "\n"
+
+            elif kind == "on_tool_end":
+                output = event.get("data", {}).get("output", "")
+                tool_name = event.get("name", "unknown")
+                tool_call_id = event.get("run_id", "")
+                if output is not None:
+                    tool_results_buffer.append(output)
+                    output_str = _stringify_output(output)
+                    yield json.dumps({
+                        "type": "tool_end",
+                        "tool": tool_name,
+                        "toolCallId": tool_call_id,
+                        "output": output_str,
+                    }, ensure_ascii=False) + "\n"
+    except Exception as e:
+        logger.error("agent", f"Stream error in place_search: {e}")
+        yield json.dumps({"type": "token", "content": "\n\n抱歉，处理过程中出现错误，请重试。"}, ensure_ascii=False) + "\n"
 
     # Extract metadata and save
     final_text = "".join(token_buffer) or "已为您搜索到相关地点。"
@@ -99,9 +103,8 @@ async def handle_place_search(
     metadata["intent"] = "place_search"
 
     await message_manager.save_message(session_id, "assistant", final_text, meta=metadata)
-    await message_manager.touch_session(
-        await message_manager.get_or_create_session(session_id, user_id)
-    )
+    sess = await message_manager.get_or_create_session(session_id, user_id)
+    await message_manager.touch_session(sess)
 
     if metadata.get("suggestedPlaces"):
         yield json.dumps({"type": "meta", "data": metadata}, ensure_ascii=False) + "\n"
