@@ -4,6 +4,7 @@ import { X, Send, Plus, Trash2, Loader2, Bot, User, MapPin, ArrowLeft, MessageSq
 import { useTripStore } from '../store'
 import { AgentSuggestedPlaceCard } from './AgentSuggestedPlaceCard'
 import { AgentDayPlanCard } from './AgentDayPlanCard'
+import { AgentToolCallCard } from './AgentToolCallCard'
 import ReactMarkdown from 'react-markdown'
 
 export function AgentPanel() {
@@ -226,6 +227,15 @@ export function AgentPanel() {
                       }
                     </div>
                     <div className={`max-w-[80%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+                      {/* Tool steps */}
+                      {msg.role === 'assistant' && msg.toolSteps && msg.toolSteps.length > 0 && (
+                        <div className="space-y-1.5 mb-2">
+                          {msg.toolSteps.map((step) => (
+                            <AgentToolCallCard key={step.toolCallId} step={step} />
+                          ))}
+                        </div>
+                      )}
+
                       <div className={`inline-block rounded-2xl px-4 py-2.5 text-sm ${
                         msg.role === 'user'
                           ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
