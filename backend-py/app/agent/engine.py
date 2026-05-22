@@ -132,6 +132,14 @@ def _extract_metadata(tool_results: list[Any]) -> dict:
                 data = json.loads(result)
             elif isinstance(result, dict):
                 data = result
+            elif hasattr(result, "content"):
+                content = result.content
+                if isinstance(content, str):
+                    data = json.loads(content)
+                elif isinstance(content, dict):
+                    data = content
+                else:
+                    continue
             else:
                 continue
         except (json.JSONDecodeError, TypeError):
@@ -235,11 +243,19 @@ async def stream_chat_with_agent(
                 tool_call_id = event.get("data", {}).get("id", "")
                 if output is not None:
                     tool_results_buffer.append(output)
+                    if isinstance(output, str):
+                        output_str = output
+                    elif hasattr(output, "content"):
+                        output_str = str(output.content)
+                    elif isinstance(output, dict):
+                        output_str = json.dumps(output, ensure_ascii=False)
+                    else:
+                        output_str = str(output)
                     yield json.dumps({
                         "type": "tool_end",
                         "tool": tool_name,
                         "toolCallId": tool_call_id,
-                        "output": output if isinstance(output, str) else json.dumps(output, ensure_ascii=False),
+                        "output": output_str,
                     }, ensure_ascii=False) + "\n"
 
         final_text = "".join(token_buffer) or "已处理您的请求。"
