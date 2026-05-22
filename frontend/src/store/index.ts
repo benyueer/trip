@@ -222,7 +222,7 @@ export interface TripState {
   sendAgentMessage: (content: string, currentTripId?: string) => Promise<void>
   setAgentPanelOpen: (open: boolean) => void
   clearSuggestedPlaces: () => void
-  addSuggestedPlaceToTrip: (place: { name: string; lngLat: [number, number]; description?: string; category?: string; address?: string; rating?: string; ticket?: string }, dayIndex?: number) => void
+  addSuggestedPlaceToTrip: (place: { name: string; lngLat: [number, number]; description?: string; category?: string; address?: string; rating?: string; ticket?: string; openingHours?: string; phone?: string; notes?: string }, dayIndex?: number) => void
   setAgentPlanRoutes: (routes: Array<{ distance: string; duration: string; path: [number, number][] }> | null) => void
 }
 
@@ -774,9 +774,9 @@ export const useTripStore = create<TripState>((set, get) => ({
       address: place.address || '',
       rating: place.rating || '',
       ticket: place.ticket || '',
-      openingHours: '',
-      phone: '',
-      notes: '',
+      openingHours: place.openingHours || '',
+      phone: place.phone || '',
+      notes: place.notes || '',
     })
 
     get().updateCurrentTrip({ days: newDays })

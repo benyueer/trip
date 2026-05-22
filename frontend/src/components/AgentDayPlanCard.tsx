@@ -12,6 +12,8 @@ interface Place {
   rating?: string
   ticket?: string
   openingHours?: string
+  phone?: string
+  notes?: string
   order: number
 }
 
@@ -64,8 +66,8 @@ export function AgentDayPlanCard({ plan, onAccept, onReject }: Props) {
         rating: place.rating || '',
         ticket: place.ticket || '',
         openingHours: place.openingHours || '',
-        phone: '',
-        notes: '',
+        phone: place.phone || '',
+        notes: place.notes || '',
       })
     }
     updateCurrentTrip({ days: newDays })

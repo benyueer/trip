@@ -165,7 +165,7 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
 
     @tool("createTripPlan")
     async def create_trip_plan_(title: str, days: list[dict], description: str = "") -> dict:
-        """Create a new trip itinerary with multiple days and places. Each day must have a dayIndex, description, and items array with name and lngLat."""
+        """Create a new trip itinerary with multiple days and places. Each day must have a dayIndex, description, and items array. Each item must have name and lngLat ([lng, lat] array), and can optionally have: description, category, address, rating, ticket, openingHours, phone, notes."""
         logger.agent.tool_call("createTripPlan", {"title": title, "days_count": len(days)})
 
         trip = Trip(title=title, description=description, ownerId=user_id)
@@ -193,6 +193,8 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
                     rating=item_d.get("rating", ""),
                     ticket=item_d.get("ticket", ""),
                     openingHours=item_d.get("openingHours", ""),
+                    phone=item_d.get("phone", ""),
+                    notes=item_d.get("notes", ""),
                     dayId=day.id,
                 )
                 db_session.add(item)
@@ -243,6 +245,11 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
                 description=new_place.get("description", ""),
                 category=new_place.get("category", ""),
                 address=new_place.get("address", ""),
+                rating=new_place.get("rating", ""),
+                ticket=new_place.get("ticket", ""),
+                openingHours=new_place.get("openingHours", ""),
+                phone=new_place.get("phone", ""),
+                notes=new_place.get("notes", ""),
                 dayId=day.id,
             )
             db_session.add(item)
@@ -258,6 +265,16 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
                     day.items[idx].category = new_place["category"]
                 if new_place.get("address"):
                     day.items[idx].address = new_place["address"]
+                if new_place.get("rating"):
+                    day.items[idx].rating = new_place["rating"]
+                if new_place.get("ticket"):
+                    day.items[idx].ticket = new_place["ticket"]
+                if new_place.get("openingHours"):
+                    day.items[idx].openingHours = new_place["openingHours"]
+                if new_place.get("phone"):
+                    day.items[idx].phone = new_place["phone"]
+                if new_place.get("notes"):
+                    day.items[idx].notes = new_place["notes"]
 
         await db_session.flush()
         logger.agent.trip_modified(trip_id, f'{action} "{place_name}" in day{day_index}')
@@ -272,7 +289,7 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         places: list[dict],
         description: str = "",
     ) -> dict:
-        """Plan a single day itinerary with ordered places and routing. Must provide real coordinates (lngLat) for each place. Call this after searching for attractions."""
+        """Plan a single day itinerary with ordered places and routing. Each place must have name and lngLat ([lng, lat] array), and can optionally have: description, category, address, rating, ticket, openingHours, phone, notes."""
         logger.agent.tool_call("planDayRoute", {
             "dayIndex": day_index,
             "title": title,
@@ -289,6 +306,8 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
                 "rating": p.get("rating", ""),
                 "ticket": p.get("ticket", ""),
                 "openingHours": p.get("openingHours", ""),
+                "phone": p.get("phone", ""),
+                "notes": p.get("notes", ""),
                 "order": p.get("order", i + 1),
             }
             for i, p in enumerate(places)
