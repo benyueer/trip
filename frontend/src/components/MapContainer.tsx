@@ -9,6 +9,15 @@ declare global {
   }
 }
 
+function toLngLat(val: any): [number, number] {
+  if (Array.isArray(val)) return val as [number, number]
+  if (typeof val === 'string') {
+    const parts = val.split(',')
+    if (parts.length === 2) return [parseFloat(parts[0]), parseFloat(parts[1])]
+  }
+  return [120.155, 30.27]
+}
+
 // 配置高德地图安全密钥
 window._AMapSecurityConfig = {
   securityJsCode: import.meta.env.VITE_AMAP_SECURITY_CODE,
@@ -60,7 +69,7 @@ export default function MapContainer() {
           .flatMap((d: any) => d.items)
           .filter((i: any) => i.type === "place");
         const initialCenter =
-          allPlaces.length > 0 ? allPlaces[0].lngLat : [120.155, 30.27];
+          allPlaces.length > 0 ? toLngLat(allPlaces[0].lngLat) : [120.155, 30.27];
 
         map.current = new AMap.Map(mapContainer.current, {
           viewMode: "2D",
@@ -185,7 +194,7 @@ export default function MapContainer() {
 
     // 初始化中心点（仅一次）
     if (!hasSetInitialCenter.current && places.length > 0) {
-      currentMap.setZoomAndCenter(11, places[0].lngLat);
+      currentMap.setZoomAndCenter(11, toLngLat(places[0].lngLat));
       hasSetInitialCenter.current = true;
     }
 
@@ -266,7 +275,7 @@ export default function MapContainer() {
       }
 
       const marker = new AMap.Marker({
-        position: place.lngLat,
+        position: toLngLat(place.lngLat),
         content: markerContent,
         offset: new AMap.Pixel(0, 0),
         anchor: "bottom-center",
@@ -318,7 +327,7 @@ export default function MapContainer() {
             </div>`;
 
         const marker = new AMap.Marker({
-          position: cached.lngLat,
+          position: toLngLat(cached.lngLat),
           content: markerContent,
           offset: new AMap.Pixel(0, 0),
           anchor: "bottom-center",
@@ -421,13 +430,13 @@ export default function MapContainer() {
 
     const highlightedPlace = places.find((p) => p.id === highlightedId);
     if (highlightedPlace) {
-      currentMap.setZoomAndCenter(14, highlightedPlace.lngLat);
+      currentMap.setZoomAndCenter(14, toLngLat(highlightedPlace.lngLat));
       lastCenteredId.current = highlightedId;
     } else if (showAllPlaces && allPlacesCache) {
       // 检查是否在所有地点缓存中
       const cachedPlace = allPlacesCache.find((p) => p.id === highlightedId);
       if (cachedPlace) {
-        currentMap.setZoomAndCenter(14, cachedPlace.lngLat);
+        currentMap.setZoomAndCenter(14, toLngLat(cachedPlace.lngLat));
         lastCenteredId.current = highlightedId;
       }
     } else {
@@ -536,7 +545,7 @@ export default function MapContainer() {
       `;
 
       const marker = new AMap.Marker({
-        position: place.lngLat,
+        position: toLngLat(place.lngLat),
         content: markerContent,
         offset: new AMap.Pixel(0, 0),
         anchor: "bottom-center",
@@ -545,7 +554,7 @@ export default function MapContainer() {
       });
 
       marker.on("click", () => {
-        currentMap.setZoomAndCenter(14, place.lngLat);
+        currentMap.setZoomAndCenter(14, toLngLat(place.lngLat));
         window.dispatchEvent(
           new CustomEvent("agent:focusCard", { detail: { index } })
         );
