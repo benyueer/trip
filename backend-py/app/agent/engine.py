@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import AsyncIterator, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,8 +48,6 @@ async def stream_chat_with_agent(
         # Ensure session exists
         await message_manager.get_or_create_session(session_id, user_id)
 
-        logger.agent.stream_start(session_id)
-
         # Select handler based on intent
         handler = _HANDLERS.get(intent)
         if handler is None:
@@ -70,7 +69,15 @@ async def stream_chat_with_agent(
         if intent == "memory":
             handler_kwargs.pop("current_trip_id", None)
 
-        async for chunk in handler(**handler_kwargs):
-            yield chunk
-
-        logger.agent.stream_end(session_id)
+        text_length = 0
+        try:
+            async for chunk in handler(**handler_kwargs):
+                text_length += len(chunk)
+                yield chunk
+            await db_session.commit()
+        except Exception as e:
+            await db_session.rollback()
+            logger.error("agent", f"Handler error for intent '{intent}': {e}")
+            yield json.dumps({"type": "token", "content": "\n\n抱歉，处理过程中出现错误，请重试。"}, ensure_ascii=False) + "\n"
+        finally:
+            logger.agent.stream_end(session_id, text_length)

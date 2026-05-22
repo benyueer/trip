@@ -86,7 +86,10 @@ async def handle_memory(
                     }, ensure_ascii=False) + "\n"
     except Exception as e:
         logger.error("agent", f"Stream error in memory: {e}")
-        yield json.dumps({"type": "token", "content": "\n\n抱歉，处理过程中出现错误，请重试。"}, ensure_ascii=False) + "\n"
+        error_msg = "\n\n抱歉，处理过程中出现错误，请重试。"
+        yield json.dumps({"type": "token", "content": error_msg}, ensure_ascii=False) + "\n"
+        await message_manager.save_message(session_id, "assistant", error_msg, meta={"intent": "memory", "error": True})
+        return
 
     final_text = "".join(token_buffer) or "已记住您的偏好。"
     metadata = {"intent": "memory"}

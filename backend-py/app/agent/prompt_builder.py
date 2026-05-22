@@ -66,12 +66,16 @@ TRIP_PLANNER_PROMPT = """
 4. 最后必须调用 planDayRoute 工具，传入所有景点的名称和真实经纬度
 5. 等待用户确认方案后，如用户接受则调用 modifyTripPlan 将景点添加到行程
 
+用户接受方案时的操作：
+- 如果用户指定了当前行程（currentTripId），使用 modifyTripPlan 的 "add" 动作逐个添加景点
+- 如果没有当前行程，先调用 createTripPlan 创建行程，再用 modifyTripPlan 添加后续天数的景点
+- modifyTripPlan 的 "add" 动作会自动创建不存在的天数，无需担心天数不存在
+
 重要约束：
 - planDayRoute 是必须调用的最终步骤，不要只搜索就结束
 - 每个景点必须有真实的经纬度（来自高德地图）
 - 推荐景点数量 4-8 个为宜
-- 回复时说明规划思路，并提示用户可以接受或拒绝方案
-- 如果用户指定了当前行程（currentTripId），规划完成后直接添加到该行程"""
+- 回复时说明规划思路，并提示用户可以接受或拒绝方案"""
 
 
 MEMORY_PROMPT = """

@@ -49,11 +49,13 @@ export function AgentDayPlanCard({ plan, onAccept, onReject }: Props) {
       return
     }
     const newDays = [...currentTrip.days]
-    let day = newDays.find(d => d.dayIndex === plan.dayIndex)
-    if (!day) {
-      day = { dayIndex: plan.dayIndex, items: [] }
-      newDays.push(day)
-    }
+    // Always create a new day at the end
+    const nextIndex = newDays.length > 0
+      ? Math.max(...newDays.map(d => d.dayIndex)) + 1
+      : 1
+    const day = { dayIndex: nextIndex, items: [] as any[] }
+    newDays.push(day)
+
     for (const place of plan.places) {
       day.items.push({
         id: crypto.randomUUID(),

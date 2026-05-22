@@ -214,11 +214,13 @@ async def create_trip(
         await db_session.flush()
 
         for item_data in day_data.get("items", []):
+            raw_lnglat = item_data.get("lngLat", "[]")
+            lnglat_str = json.dumps(raw_lnglat) if isinstance(raw_lnglat, list) else raw_lnglat
             item = Item(
                 id=item_data.get("id"),
                 type=item_data.get("type", "place"),
                 name=item_data.get("name", ""),
-                lngLat=item_data.get("lngLat", json.dumps(item_data.get("lngLat", []))),
+                lngLat=lnglat_str,
                 distance=item_data.get("distance"),
                 duration=item_data.get("duration"),
                 path=json.dumps(item_data.get("path")) if item_data.get("path") else None,
@@ -357,6 +359,13 @@ async def calculate_and_add_route(
 
     if not start_lng_lat or not end_lng_lat or not mode:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Missing required routing parameters")
+
+    if not isinstance(start_lng_lat, (list, tuple)) or len(start_lng_lat) < 2:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="startLngLat must be [lng, lat]")
+    if not isinstance(end_lng_lat, (list, tuple)) or len(end_lng_lat) < 2:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="endLngLat must be [lng, lat]")
+    if mode not in ("Driving", "Walking", "Riding"):
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="mode must be Driving, Walking, or Riding")
 
     if not settings.amap_web_key:
         raise HTTPException(status_code=500, detail="AMAP_WEB_KEY is not configured on server")

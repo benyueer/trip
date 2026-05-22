@@ -69,10 +69,14 @@ async def create_agent_session(
 @delete("/api/agent/sessions/{session_id:str}", status_code=HTTP_204_NO_CONTENT, guards=[require_auth])
 async def delete_agent_session(
     session_id: str,
+    request: Request,
     db_session: AsyncSession,
 ) -> None:
+    user_id = request.user["id"]
     result = await db_session.execute(
-        select(AgentSession).where(AgentSession.id == session_id)
+        select(AgentSession).where(
+            (AgentSession.id == session_id) & (AgentSession.userId == user_id)
+        )
     )
     session = result.scalar_one_or_none()
     if session:
@@ -83,8 +87,18 @@ async def delete_agent_session(
 @get("/api/agent/sessions/{session_id:str}/messages", guards=[require_auth])
 async def get_agent_messages(
     session_id: str,
+    request: Request,
     db_session: AsyncSession,
 ) -> list[dict]:
+    user_id = request.user["id"]
+    session_result = await db_session.execute(
+        select(AgentSession).where(
+            (AgentSession.id == session_id) & (AgentSession.userId == user_id)
+        )
+    )
+    if not session_result.scalar_one_or_none():
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Session not found")
+
     result = await db_session.execute(
         select(AgentMessage)
         .where(AgentMessage.sessionId == session_id)
@@ -117,6 +131,14 @@ async def agent_chat(
 
     if not content:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Message content is required")
+
+    session_result = await db_session.execute(
+        select(AgentSession).where(
+            (AgentSession.id == session_id) & (AgentSession.userId == user_id)
+        )
+    )
+    if not session_result.scalar_one_or_none():
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Session not found")
 
     logger.agent.chat(user_id, session_id, content)
 
@@ -209,10 +231,14 @@ async def get_agent_memories(
 @delete("/api/agent/memories/{memory_id:str}", status_code=HTTP_204_NO_CONTENT, guards=[require_auth])
 async def delete_agent_memory(
     memory_id: str,
+    request: Request,
     db_session: AsyncSession,
 ) -> None:
+    user_id = request.user["id"]
     result = await db_session.execute(
-        select(UserMemory).where(UserMemory.id == memory_id)
+        select(UserMemory).where(
+            (UserMemory.id == memory_id) & (UserMemory.userId == user_id)
+        )
     )
     memory = result.scalar_one_or_none()
     if memory:

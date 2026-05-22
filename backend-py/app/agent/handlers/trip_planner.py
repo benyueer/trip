@@ -94,7 +94,10 @@ async def handle_trip_planner(
                     }, ensure_ascii=False) + "\n"
     except Exception as e:
         logger.error("agent", f"Stream error in trip_planner: {e}")
-        yield json.dumps({"type": "token", "content": "\n\n抱歉，处理过程中出现错误，请重试。"}, ensure_ascii=False) + "\n"
+        error_msg = "\n\n抱歉，处理过程中出现错误，请重试。"
+        yield json.dumps({"type": "token", "content": error_msg}, ensure_ascii=False) + "\n"
+        await message_manager.save_message(session_id, "assistant", error_msg, meta={"intent": "trip_planner", "error": True})
+        return
 
     # Extract metadata and save
     final_text = "".join(token_buffer) or "已为您规划行程。"

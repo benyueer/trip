@@ -16,15 +16,18 @@ from app.services.amap_route import calculate_routes_between_places
 
 def _normalize_lnglat(val: Any) -> list[float]:
     """Normalize lngLat to [lng, lat] array. Handles string 'lng,lat', JSON string '[lng,lat]', and array."""
-    if isinstance(val, list):
-        return [float(x) for x in val]
+    if isinstance(val, list) and len(val) >= 2:
+        try:
+            return [float(x) for x in val[:2]]
+        except (ValueError, TypeError):
+            return []
     if isinstance(val, str):
         # Try JSON parse first (e.g. "[120.15, 30.25]")
         try:
             parsed = json.loads(val)
-            if isinstance(parsed, list):
-                return [float(x) for x in parsed]
-        except (json.JSONDecodeError, TypeError):
+            if isinstance(parsed, list) and len(parsed) >= 2:
+                return [float(x) for x in parsed[:2]]
+        except (json.JSONDecodeError, TypeError, ValueError):
             pass
         # Try comma-separated (e.g. "120.15,30.25")
         if "," in val:
@@ -44,6 +47,9 @@ async def web_search(query: str) -> dict:
 
     logger.agent.tool_call("webSearch", {"query": query})
 
+    if not query or not query.strip():
+        return {"answer": "Search query is required", "results": []}
+
     if not settings.tavily_api_key:
         logger.error("tools", "TAVILY_API_KEY not configured")
         return {"answer": "Web search not configured", "results": []}
@@ -61,8 +67,9 @@ async def web_search(query: str) -> dict:
                     "include_answer": True,
                     "search_depth": "basic",
                 },
-                timeout=10,
+                timeout=15,
             )
+            response.raise_for_status()
             data = response.json()
 
         results = [
@@ -95,6 +102,9 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
     async def query_local_places(query: str, limit: int = 10) -> dict:
         """Search for travel destinations, attractions, and places in the local database. Returns real geographic data (coordinates, addresses)."""
         logger.agent.tool_call("queryLocalPlaces", {"query": query, "limit": limit})
+
+        if not query or not query.strip():
+            return {"places": [], "count": 0, "suggested_places": []}
 
         result = await db_session.execute(
             select(Item)
@@ -140,6 +150,11 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         """Save a user travel preference or fact (e.g. '不喜欢爬山', '喜欢美食'). The category can be 'preference', 'habit', or 'experience'."""
         logger.agent.tool_call("saveUserMemory", {"content": content, "category": category})
 
+        if not content or not content.strip():
+            return {"saved": False, "error": "Content is required"}
+        if category not in ("preference", "habit", "experience"):
+            category = "preference"
+
         result = await db_session.execute(
             select(UserMemory).where(UserMemory.userId == user_id)
         )
@@ -168,7 +183,12 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         """Create a new trip itinerary with multiple days and places. Each day must have a dayIndex, description, and items array. Each item must have name and lngLat ([lng, lat] array), and can optionally have: description, category, address, rating, ticket, openingHours, phone, notes."""
         logger.agent.tool_call("createTripPlan", {"title": title, "days_count": len(days)})
 
-        trip = Trip(title=title, description=description, ownerId=user_id)
+        if not title or not title.strip():
+            return {"error": "Trip title is required"}
+        if not days:
+            return {"error": "At least one day is required"}
+
+        trip = Trip(title=title.strip(), description=description, ownerId=user_id)
         db_session.add(trip)
         await db_session.flush()
 
@@ -182,10 +202,13 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
             await db_session.flush()
 
             for item_d in day_d.get("items", []):
+                item_name = item_d.get("name", "").strip()
+                if not item_name:
+                    continue
                 item = Item(
                     id=str(uuid.uuid4()),
                     type="place",
-                    name=item_d.get("name", ""),
+                    name=item_name,
                     lngLat=json.dumps(_normalize_lnglat(item_d.get("lngLat", []))),
                     description=item_d.get("description", ""),
                     category=item_d.get("category", ""),
@@ -215,11 +238,18 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
     ) -> dict:
         """Modify an existing trip. Actions: 'add' a place, 'remove' a place, or 'replace' a place with new_place data."""
         logger.agent.tool_call("modifyTripPlan", {
-            "tripId": trip_id[:8],
+            "tripId": trip_id[:8] if trip_id else "None",
             "action": action,
             "dayIndex": day_index,
             "placeName": place_name,
         })
+
+        if not trip_id:
+            return {"error": "trip_id is required"}
+        if action not in ("add", "remove", "replace"):
+            return {"error": f"Invalid action: {action}. Must be add, remove, or replace"}
+        if action in ("add", "replace") and not new_place:
+            return {"error": f"new_place is required for action '{action}'"}
 
         result = await db_session.execute(
             select(Trip)
@@ -231,12 +261,16 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
             return {"error": "Trip not found"}
 
         day = next((d for d in trip.days if d.dayIndex == day_index), None)
-        if not day:
-            return {"error": f"Day {day_index} not found"}
 
         if action == "remove":
+            if not day:
+                return {"error": f"Day {day_index} not found"}
             day.items = [i for i in day.items if i.name != place_name]
         elif action == "add" and new_place:
+            if not day:
+                day = Day(dayIndex=day_index, tripId=trip_id)
+                db_session.add(day)
+                await db_session.flush()
             item = Item(
                 id=str(uuid.uuid4()),
                 type="place",
@@ -254,6 +288,8 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
             )
             db_session.add(item)
         elif action == "replace" and new_place:
+            if not day:
+                return {"error": f"Day {day_index} not found"}
             idx = next((i for i, item in enumerate(day.items) if item.name == place_name), None)
             if idx is not None:
                 if "name" in new_place:
@@ -296,6 +332,11 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
             "title": title,
             "placesCount": len(places),
         })
+
+        if not title or not title.strip():
+            return {"error": "Day title is required"}
+        if not places:
+            return {"error": "At least one place is required"}
 
         mapped_places = [
             {

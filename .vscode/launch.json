@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python Backend (backend-py)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "app",
+      "cwd": "${workspaceFolder}/backend-py",
+      "envFile": "${workspaceFolder}/backend-py/.env",
+      "justMyCode": true,
+      "args": []
+    }
+  ]
+}
