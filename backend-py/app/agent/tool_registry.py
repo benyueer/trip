@@ -5,7 +5,6 @@ from typing import Optional
 from langchain_core.tools import BaseTool
 
 from app.clients.mcp_client import get_mcp_tools
-from app.logger import logger
 
 
 class ToolRegistry:

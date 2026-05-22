@@ -256,24 +256,25 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         elif action == "replace" and new_place:
             idx = next((i for i, item in enumerate(day.items) if item.name == place_name), None)
             if idx is not None:
-                day.items[idx].name = new_place.get("name", day.items[idx].name)
-                if new_place.get("lngLat"):
+                if "name" in new_place:
+                    day.items[idx].name = new_place["name"]
+                if "lngLat" in new_place:
                     day.items[idx].lngLat = json.dumps(_normalize_lnglat(new_place["lngLat"]))
-                if new_place.get("description"):
+                if "description" in new_place:
                     day.items[idx].description = new_place["description"]
-                if new_place.get("category"):
+                if "category" in new_place:
                     day.items[idx].category = new_place["category"]
-                if new_place.get("address"):
+                if "address" in new_place:
                     day.items[idx].address = new_place["address"]
-                if new_place.get("rating"):
+                if "rating" in new_place:
                     day.items[idx].rating = new_place["rating"]
-                if new_place.get("ticket"):
+                if "ticket" in new_place:
                     day.items[idx].ticket = new_place["ticket"]
-                if new_place.get("openingHours"):
+                if "openingHours" in new_place:
                     day.items[idx].openingHours = new_place["openingHours"]
-                if new_place.get("phone"):
+                if "phone" in new_place:
                     day.items[idx].phone = new_place["phone"]
-                if new_place.get("notes"):
+                if "notes" in new_place:
                     day.items[idx].notes = new_place["notes"]
 
         await db_session.flush()
