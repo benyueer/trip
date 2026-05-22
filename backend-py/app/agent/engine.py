@@ -243,7 +243,7 @@ async def stream_chat_with_agent(
             elif kind == "on_tool_start":
                 tool_name = event.get("name", "unknown")
                 tool_input = event.get("data", {}).get("input", {})
-                tool_call_id = event.get("data", {}).get("id", "")
+                tool_call_id = event.get("run_id", "")
                 logger.agent.tool_call(tool_name, tool_input)
                 yield json.dumps({
                     "type": "tool_start",
@@ -255,7 +255,7 @@ async def stream_chat_with_agent(
             elif kind == "on_tool_end":
                 output = event.get("data", {}).get("output", "")
                 tool_name = event.get("name", "unknown")
-                tool_call_id = event.get("data", {}).get("id", "")
+                tool_call_id = event.get("run_id", "")
                 if output is not None:
                     tool_results_buffer.append(output)
                     if isinstance(output, str):
