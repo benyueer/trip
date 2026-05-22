@@ -325,7 +325,7 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         logger.info("tools", f'planDayRoute(day{day_index}, "{title}") → {len(mapped_places)} places, {len(routes)} routes')
         return {"status": "plan_ready", "plan": plan, "message": f"已为您规划第{day_index}天的行程，请查看方案并选择接受或拒绝。"}
 
-    return [
+    tools_list = [
         web_search,
         query_local_places,
         save_user_memory_,
@@ -333,3 +333,13 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         modify_trip_plan_,
         plan_day_route_,
     ]
+
+    # Tag tools with the intents they serve
+    web_search._intent_tags = ["place_search", "trip_planner"]
+    query_local_places._intent_tags = ["place_search", "trip_planner"]
+    save_user_memory_._intent_tags = ["memory"]
+    create_trip_plan_._intent_tags = ["trip_planner"]
+    modify_trip_plan_._intent_tags = ["trip_planner"]
+    plan_day_route_._intent_tags = ["trip_planner"]
+
+    return tools_list
