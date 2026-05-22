@@ -628,22 +628,30 @@ export const useTripStore = create<TripState>((set, get) => ({
 
       // Check if it's a JSON response (blocked by intent) or SSE stream
       const contentType = response.headers.get('content-type') || ''
+      let rawBodyForFallback: string | null = null
       if (contentType.includes('application/json')) {
         // Blocked message (harmful/off_topic) — comes back as plain JSON
-        const data = await response.json()
-        set(state => ({
-          agentMessages: state.agentMessages.map(m =>
-            m.id === assistantId
-              ? { ...m, content: data.content, metadata: data.metadata }
-              : m
-          ),
-          agentLoading: false,
-        }))
-        return
+        try {
+          rawBodyForFallback = await response.text()
+          const data = JSON.parse(rawBodyForFallback)
+          set(state => ({
+            agentMessages: state.agentMessages.map(m =>
+              m.id === assistantId
+                ? { ...m, content: data.content, metadata: data.metadata }
+                : m
+            ),
+            agentLoading: false,
+          }))
+          return
+        } catch {
+          console.warn('[sendAgentMessage] Content-Type is application/json but body is not JSON, treating as text stream')
+        }
       }
 
       // Text stream — read tokens incrementally
-      const reader = response.body!.getReader()
+      const reader = rawBodyForFallback !== null
+        ? new Response(rawBodyForFallback).body!.getReader()
+        : response.body!.getReader()
       const decoder = new TextDecoder()
       let fullText = ''
 
@@ -654,7 +662,6 @@ export const useTripStore = create<TripState>((set, get) => ({
         const chunk = decoder.decode(value, { stream: true })
         fullText += chunk
 
-        // Update the streaming message in real-time (strip metadata line from display)
         const displayText = fullText.replace(/\n__AGENT_META__\{.*\}$/, '')
         set(state => ({
           agentMessages: state.agentMessages.map(m =>
@@ -665,19 +672,13 @@ export const useTripStore = create<TripState>((set, get) => ({
         }))
       }
 
-      // Extract metadata appended by the server at the end of the stream
       const metaMatch = fullText.match(/\n__AGENT_META__({.*})$/)
       let metadata: Record<string, any> = {}
 
       if (metaMatch) {
-        try {
-          metadata = JSON.parse(metaMatch[1])
-        } catch {
-          // Ignore parse errors
-        }
+        try { metadata = JSON.parse(metaMatch[1]) } catch {}
       }
 
-      // Clean display text (remove metadata line)
       const cleanText = fullText.replace(/\n__AGENT_META__\{.*\}$/, '')
 
       set(state => ({
@@ -690,15 +691,24 @@ export const useTripStore = create<TripState>((set, get) => ({
         agentSuggestedPlaces: metadata.suggestedPlaces || state.agentSuggestedPlaces,
       }))
 
-      // If a trip was created, navigate to it
       if (metadata.tripId) {
         window.dispatchEvent(new CustomEvent('agent:navigateTrip', {
           detail: { tripId: metadata.tripId }
         }))
+        // Refresh trip list so PlanningListPage shows the new trip
+        get().fetchTrips()
       }
-      // If a trip was modified, refresh it immediately
       if (metadata.modifiedTripId) {
         get().fetchTripById(metadata.modifiedTripId)
+        // Invalidate allPlacesCache so FloatingPanel shows fresh data
+        set({ allPlacesCache: null, allPlacesCacheTime: 0 })
+      }
+      if (metadata.dayPlan) {
+        // Refresh current trip to pick up any day changes
+        const { currentTrip } = get()
+        if (currentTrip) {
+          get().fetchTripById(currentTrip.id)
+        }
       }
     } catch (error) {
       console.error('Failed to send agent message:', error)
