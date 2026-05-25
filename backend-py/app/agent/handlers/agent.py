@@ -1,3 +1,4 @@
+"""Unified agent handler — one entry point for all intents."""
 from __future__ import annotations
 
 import json
@@ -7,37 +8,46 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.tool_node import ToolNode
 
-from app.agent.handlers.place_search import _history_to_langchain, _stringify_output
+from app.agent.compressor import compress_tool_result
+from app.agent.handlers.base import history_to_langchain
+from app.agent.handlers.extractors import (
+    DEFAULT_RECURSION_LIMIT,
+    EXTRACTORS,
+    RECURSION_LIMITS,
+)
 from app.agent.message_manager import MessageManager
 from app.agent.prompt_builder import PromptBuilder
 from app.agent.tool_registry import ToolRegistry
 from app.config import settings
 from app.logger import logger
 
-from app.agent.compressor import compress_tool_result
 
-
-async def handle_trip_planner(
+async def handle_agent(
     *,
     user_id: str,
     session_id: str,
     user_message: str,
+    intent: str,
     current_trip_id: str | None,
     message_manager: MessageManager,
     prompt_builder: PromptBuilder,
     tool_registry: ToolRegistry,
 ) -> AsyncIterator[str]:
-    """Handle the trip_planner intent: search -> plan route -> present for approval."""
+    """Single agent handler for all intents.
 
+    Intent determines: prompt, tools, recursion limit, metadata extraction.
+    """
     # Save user message
     await message_manager.save_message(session_id, "user", user_message)
 
     # Load history (auto-compressed if too long) and build prompt
     history = await message_manager.load_compressed_history(session_id)
-    system_prompt = await prompt_builder.build(user_id, intent="trip_planner", current_trip_id=current_trip_id)
+    system_prompt = await prompt_builder.build(
+        user_id, intent=intent, current_trip_id=current_trip_id
+    )
 
-    # Get filtered tools for this intent
-    tools = tool_registry.get_tools_for_intent("trip_planner")
+    # Get tools filtered by intent
+    tools = tool_registry.get_tools_for_intent(intent)
     tool_node = ToolNode(tools, handle_tool_errors=True)
 
     # Build LLM and agent
@@ -48,10 +58,13 @@ async def handle_trip_planner(
         temperature=0.7,
         streaming=True,
     )
-    agent = create_react_agent(model=llm, tools=tool_node, prompt=system_prompt, name="trip_planner")
+    recursion_limit = RECURSION_LIMITS.get(intent, DEFAULT_RECURSION_LIMIT)
+    agent = create_react_agent(
+        model=llm, tools=tool_node, prompt=system_prompt, name=intent
+    )
 
     # Convert history and stream
-    langchain_messages = _history_to_langchain(history)
+    langchain_messages = history_to_langchain(history)
     token_buffer: list[str] = []
     tool_results_buffer: list[Any] = []
 
@@ -59,7 +72,7 @@ async def handle_trip_planner(
         async for event in agent.astream_events(
             {"messages": langchain_messages},
             version="v2",
-            config={"recursion_limit": 50},
+            config={"recursion_limit": recursion_limit},
         ):
             try:
                 kind = event["event"]
@@ -68,7 +81,10 @@ async def handle_trip_planner(
                     chunk = event["data"]["chunk"]
                     if chunk.content:
                         token_buffer.append(chunk.content)
-                        yield json.dumps({"type": "token", "content": chunk.content}, ensure_ascii=False) + "\n"
+                        yield json.dumps(
+                            {"type": "token", "content": chunk.content},
+                            ensure_ascii=False,
+                        ) + "\n"
 
                 elif kind == "on_tool_start":
                     tool_name = event.get("name", "unknown")
@@ -96,59 +112,33 @@ async def handle_trip_planner(
                             "output": output_str,
                         }, ensure_ascii=False) + "\n"
             except Exception as event_err:
-                logger.error("agent", f"Event processing error in trip_planner: {event_err}")
-                yield json.dumps({"type": "token", "content": f"\n\n[工具调用异常: {event_err}]\n"}, ensure_ascii=False) + "\n"
+                logger.error("agent", f"Event processing error in {intent}: {event_err}")
+                yield json.dumps(
+                    {"type": "token", "content": f"\n\n[工具调用异常: {event_err}]\n"},
+                    ensure_ascii=False,
+                ) + "\n"
                 continue
     except Exception as e:
-        logger.error("agent", f"Stream error in trip_planner: {e}")
+        logger.error("agent", f"Stream error in {intent}: {e}")
         error_msg = "\n\n抱歉，处理过程中出现错误，请重试。"
-        yield json.dumps({"type": "token", "content": error_msg}, ensure_ascii=False) + "\n"
-        await message_manager.save_message(session_id, "assistant", error_msg, meta={"intent": "trip_planner", "error": True})
+        yield json.dumps(
+            {"type": "token", "content": error_msg}, ensure_ascii=False
+        ) + "\n"
+        await message_manager.save_message(
+            session_id, "assistant", error_msg, meta={"intent": intent, "error": True}
+        )
         return
 
-    # Extract metadata and save
-    final_text = "".join(token_buffer) or "已为您规划行程。"
-    metadata = _extract_trip_metadata(tool_results_buffer)
-    metadata["intent"] = "trip_planner"
+    # Extract metadata using intent-specific extractor
+    final_text = "".join(token_buffer) or "已为您处理完毕。"
+    extractor = EXTRACTORS.get(intent, lambda _: {})
+    metadata = extractor(tool_results_buffer)
+    metadata["intent"] = intent
 
+    # Save assistant message
     await message_manager.save_message(session_id, "assistant", final_text, meta=metadata)
     sess = await message_manager.get_or_create_session(session_id, user_id)
     await message_manager.touch_session(sess)
 
-    if metadata:
-        yield json.dumps({"type": "meta", "data": metadata}, ensure_ascii=False) + "\n"
-
-
-def _extract_trip_metadata(tool_results: list[Any]) -> dict:
-    """Extract trip plan metadata from tool results."""
-    metadata: dict = {}
-    for result in tool_results:
-        try:
-            if isinstance(result, str):
-                data = json.loads(result)
-            elif isinstance(result, dict):
-                data = result
-            elif hasattr(result, "content"):
-                data = json.loads(result.content) if isinstance(result.content, str) else result.content
-            else:
-                continue
-        except (json.JSONDecodeError, TypeError):
-            continue
-
-        if not isinstance(data, dict):
-            continue
-
-        if data.get("tripId") and "title" in data:
-            metadata.setdefault("tripId", data["tripId"])
-            metadata.setdefault("tripTitle", data["title"])
-
-        if data.get("remainingPlaces") is not None:
-            metadata["modifiedTripId"] = data.get("tripId")
-
-        if data.get("plan"):
-            metadata["dayPlan"] = data["plan"]
-
-        if data.get("suggested_places"):
-            metadata["suggestedPlaces"] = data["suggested_places"]
-
-    return metadata
+    # Yield metadata event
+    yield json.dumps({"type": "meta", "data": metadata}, ensure_ascii=False) + "\n"
