@@ -60,3 +60,24 @@ class MessageManager:
     async def touch_session(self, session: AgentSession) -> None:
         session.updatedAt = _utcnow()
         await self.db.flush()
+
+    async def save_summary(
+        self,
+        session_id: str,
+        summary_content: str,
+        summarized_count: int,
+    ) -> AgentMessage:
+        """Save a compressed history summary as a system message."""
+        meta = json.dumps(
+            {"type": "summary", "summarizedCount": summarized_count},
+            ensure_ascii=False,
+        )
+        msg = AgentMessage(
+            sessionId=session_id,
+            role="system",
+            content=summary_content,
+            meta=meta,
+        )
+        self.db.add(msg)
+        await self.db.flush()
+        return msg
