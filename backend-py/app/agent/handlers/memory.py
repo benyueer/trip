@@ -14,6 +14,8 @@ from app.agent.tool_registry import ToolRegistry
 from app.config import settings
 from app.logger import logger
 
+from app.agent.compressor import compress_history, compress_tool_result
+
 
 async def handle_memory(
     *,
@@ -29,6 +31,12 @@ async def handle_memory(
     await message_manager.save_message(session_id, "user", user_message)
 
     history = await message_manager.load_history(session_id)
+    if len(history) > settings.agent_history_threshold:
+        old_count = len(history) - settings.agent_history_keep_recent
+        history = await compress_history(history)
+        for msg in history:
+            if msg.id == "summary":
+                await message_manager.save_summary(session_id, msg.content, old_count)
     system_prompt = await prompt_builder.build(user_id, intent="memory")
 
     tools = tool_registry.get_tools_for_intent("memory")
@@ -77,7 +85,7 @@ async def handle_memory(
                 tool_name = event.get("name", "unknown")
                 tool_call_id = event.get("run_id", "")
                 if output is not None:
-                    output_str = _stringify_output(output)
+                    output_str = compress_tool_result(output)
                     yield json.dumps({
                         "type": "tool_end",
                         "tool": tool_name,
