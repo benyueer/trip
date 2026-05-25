@@ -123,12 +123,15 @@ async def handle_place_search(
 
 
 def _history_to_langchain(history: list[AgentMessage]) -> list:
+    from langchain_core.messages import SystemMessage
     msgs = []
     for msg in history:
         if msg.role == "user":
             msgs.append(HumanMessage(content=msg.content or " "))
         elif msg.role == "assistant":
             msgs.append(AIMessage(content=msg.content or " "))
+        elif msg.role == "system":
+            msgs.append(SystemMessage(content=msg.content or " "))
     return msgs
 
 
