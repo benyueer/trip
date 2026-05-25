@@ -14,6 +14,8 @@ from app.agent.tool_registry import ToolRegistry
 from app.config import settings
 from app.logger import logger
 
+from app.agent.compressor import compress_history, compress_tool_result
+
 
 async def handle_trip_planner(
     *,
@@ -30,8 +32,14 @@ async def handle_trip_planner(
     # Save user message
     await message_manager.save_message(session_id, "user", user_message)
 
-    # Load history and build prompt
+    # Load history, compress if needed, and build prompt
     history = await message_manager.load_history(session_id)
+    if len(history) > settings.agent_history_threshold:
+        old_count = len(history) - settings.agent_history_keep_recent
+        history = await compress_history(history)
+        for msg in history:
+            if msg.id == "summary":
+                await message_manager.save_summary(session_id, msg.content, old_count)
     system_prompt = await prompt_builder.build(user_id, intent="trip_planner", current_trip_id=current_trip_id)
 
     # Get filtered tools for this intent
@@ -85,7 +93,7 @@ async def handle_trip_planner(
                 tool_call_id = event.get("run_id", "")
                 if output is not None:
                     tool_results_buffer.append(output)
-                    output_str = _stringify_output(output)
+                    output_str = compress_tool_result(output)
                     yield json.dumps({
                         "type": "tool_end",
                         "tool": tool_name,
