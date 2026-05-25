@@ -15,7 +15,7 @@ from app.config import settings
 from app.logger import logger
 from app.models import AgentMessage
 
-from app.agent.compressor import compress_history, compress_tool_result
+from app.agent.compressor import compress_tool_result
 
 
 async def handle_place_search(
@@ -33,15 +33,8 @@ async def handle_place_search(
     # Save user message
     await message_manager.save_message(session_id, "user", user_message)
 
-    # Load history, compress if needed, and build prompt
-    history = await message_manager.load_history(session_id)
-    if len(history) > settings.agent_history_threshold:
-        old_count = len(history) - settings.agent_history_keep_recent
-        history = await compress_history(history)
-        # Persist the summary
-        for msg in history:
-            if msg.id == "summary":
-                await message_manager.save_summary(session_id, msg.content, old_count)
+    # Load history (auto-compressed if too long) and build prompt
+    history = await message_manager.load_compressed_history(session_id)
     system_prompt = await prompt_builder.build(user_id, intent="place_search", current_trip_id=current_trip_id)
 
     # Get filtered tools for this intent
@@ -69,39 +62,44 @@ async def handle_place_search(
             version="v2",
             config={"recursion_limit": 30},
         ):
-            kind = event["event"]
+            try:
+                kind = event["event"]
 
-            if kind == "on_chat_model_stream":
-                chunk = event["data"]["chunk"]
-                if chunk.content:
-                    token_buffer.append(chunk.content)
-                    yield json.dumps({"type": "token", "content": chunk.content}, ensure_ascii=False) + "\n"
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    if chunk.content:
+                        token_buffer.append(chunk.content)
+                        yield json.dumps({"type": "token", "content": chunk.content}, ensure_ascii=False) + "\n"
 
-            elif kind == "on_tool_start":
-                tool_name = event.get("name", "unknown")
-                tool_input = event.get("data", {}).get("input", {})
-                tool_call_id = event.get("run_id", "")
-                logger.agent.tool_call(tool_name, tool_input)
-                yield json.dumps({
-                    "type": "tool_start",
-                    "tool": tool_name,
-                    "input": tool_input,
-                    "toolCallId": tool_call_id,
-                }, ensure_ascii=False) + "\n"
-
-            elif kind == "on_tool_end":
-                output = event.get("data", {}).get("output", "")
-                tool_name = event.get("name", "unknown")
-                tool_call_id = event.get("run_id", "")
-                if output is not None:
-                    tool_results_buffer.append(output)
-                    output_str = compress_tool_result(output)
+                elif kind == "on_tool_start":
+                    tool_name = event.get("name", "unknown")
+                    tool_input = event.get("data", {}).get("input", {})
+                    tool_call_id = event.get("run_id", "")
+                    logger.agent.tool_call(tool_name, tool_input)
                     yield json.dumps({
-                        "type": "tool_end",
+                        "type": "tool_start",
                         "tool": tool_name,
+                        "input": tool_input,
                         "toolCallId": tool_call_id,
-                        "output": output_str,
                     }, ensure_ascii=False) + "\n"
+
+                elif kind == "on_tool_end":
+                    output = event.get("data", {}).get("output", "")
+                    tool_name = event.get("name", "unknown")
+                    tool_call_id = event.get("run_id", "")
+                    if output is not None:
+                        tool_results_buffer.append(output)
+                        output_str = compress_tool_result(output)
+                        yield json.dumps({
+                            "type": "tool_end",
+                            "tool": tool_name,
+                            "toolCallId": tool_call_id,
+                            "output": output_str,
+                        }, ensure_ascii=False) + "\n"
+            except Exception as event_err:
+                logger.error("agent", f"Event processing error in place_search: {event_err}")
+                yield json.dumps({"type": "token", "content": f"\n\n[工具调用异常: {event_err}]\n"}, ensure_ascii=False) + "\n"
+                continue
     except Exception as e:
         logger.error("agent", f"Stream error in place_search: {e}")
         error_msg = "\n\n抱歉，处理过程中出现错误，请重试。"
@@ -111,15 +109,14 @@ async def handle_place_search(
 
     # Extract metadata and save
     final_text = "".join(token_buffer) or "已为您搜索到相关地点。"
-    metadata = _extract_suggested_places(tool_results_buffer)
+    metadata = _extract_places_metadata(tool_results_buffer)
     metadata["intent"] = "place_search"
 
     await message_manager.save_message(session_id, "assistant", final_text, meta=metadata)
     sess = await message_manager.get_or_create_session(session_id, user_id)
     await message_manager.touch_session(sess)
 
-    if metadata.get("suggestedPlaces"):
-        yield json.dumps({"type": "meta", "data": metadata}, ensure_ascii=False) + "\n"
+    yield json.dumps({"type": "meta", "data": metadata}, ensure_ascii=False) + "\n"
 
 
 def _history_to_langchain(history: list[AgentMessage]) -> list:
@@ -145,9 +142,18 @@ def _stringify_output(output: Any) -> str:
     return str(output)
 
 
-def _extract_suggested_places(tool_results: list[Any]) -> dict:
-    """Extract suggestedPlaces from tool call results."""
+def _extract_places_metadata(tool_results: list[Any]) -> dict:
+    """Extract place data from tool call results.
+
+    Processes ALL tool results (no early break). Separates structured
+    place data (with lngLat) from webSearch results (without coordinates).
+    Prefers structured data; only falls back to webSearch results if
+    no structured places were found.
+    """
     metadata: dict = {}
+    structured: list[dict] = []   # has lngLat
+    fallback: list[dict] = []     # from webSearch, no lngLat
+
     for result in tool_results:
         try:
             if isinstance(result, str):
@@ -164,7 +170,56 @@ def _extract_suggested_places(tool_results: list[Any]) -> dict:
         if not isinstance(data, dict):
             continue
 
-        if data.get("suggested_places"):
-            metadata["suggestedPlaces"] = data["suggested_places"]
+        # Scan all list-valued keys for place items
+        for key in ("suggested_places", "places", "results", "pois"):
+            val = data.get(key)
+            if not isinstance(val, list) or not val:
+                continue
+            for item in val:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name") or item.get("title") or item.get("pname")
+                if not name:
+                    continue
+                lnglat = item.get("lngLat") or item.get("location") or []
+                # AMap returns location as "lng,lat" string
+                if isinstance(lnglat, str) and "," in lnglat:
+                    try:
+                        parts = lnglat.split(",")
+                        lnglat = [float(parts[0]), float(parts[1])]
+                    except (ValueError, IndexError):
+                        lnglat = []
+                if isinstance(lnglat, list) and len(lnglat) >= 2 and lnglat[0] and lnglat[1]:
+                    structured.append({
+                        "name": name,
+                        "lngLat": lnglat[:2],
+                        "description": item.get("description") or item.get("snippet", ""),
+                        "category": item.get("category") or item.get("type", ""),
+                        "address": item.get("address") or item.get("addr", ""),
+                        "rating": item.get("rating", ""),
+                        "ticket": item.get("ticket", ""),
+                        "openingHours": item.get("openingHours") or item.get("business_hours", ""),
+                    })
+                else:
+                    fallback.append({
+                        "name": name,
+                        "lngLat": [],
+                        "description": item.get("description") or item.get("snippet", ""),
+                        "address": item.get("address") or item.get("url", ""),
+                    })
+
+    # Prefer structured places; fall back to webSearch results
+    all_places = structured if structured else fallback
+
+    if all_places:
+        # De-duplicate by name
+        seen: set[str] = set()
+        unique: list[dict] = []
+        for p in all_places:
+            key = str(p.get("name", ""))
+            if key and key not in seen:
+                seen.add(key)
+                unique.append(p)
+        metadata["suggestedPlaces"] = unique
 
     return metadata

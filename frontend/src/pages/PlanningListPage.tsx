@@ -142,11 +142,14 @@ const PlanningListPage: React.FC = () => {
                       <div className='w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors'>
                         <Calendar size={32} />
                       </div>
-                      <div>
+                      <div className='min-w-0'>
                         <h3 className='text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors'>
                           {trip.title}
                         </h3>
-                        <p className='text-sm text-gray-400 flex items-center gap-1'>
+                        {trip.description && (
+                          <p className='text-sm text-gray-500 truncate max-w-md'>{trip.description}</p>
+                        )}
+                        <p className='text-sm text-gray-400 flex items-center gap-1 mt-0.5'>
                           创建于 {new Date(trip.createdAt).toLocaleDateString()}
                         </p>
                       </div>

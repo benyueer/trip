@@ -1,4 +1,31 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/backend-py/.venv/bin/python3",
-  "python.terminal.activateEnvironment": false
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend-py/.venv/bin/python",
+  "python.terminal.activateEnvironment": false,
+  "python.analysis.venvPath": "${workspaceFolder}/backend-py",
+  "python.analysis.venv": ".venv",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend-py"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/backend-py"
+  ],
+  "python.languageServer": "Pylance",
+  "python-envs.workspaceSearchPaths": [
+    "${workspaceFolder}/backend-py"
+  ],
+  "python.analysis.exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "backend-py/.venv"
+  ],
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true
+  }
 }

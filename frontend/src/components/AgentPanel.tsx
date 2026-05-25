@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Plus, Trash2, Loader2, Bot, User, MapPin, ArrowLeft, MessageSquare } from 'lucide-react'
 import { useTripStore } from '../store'
-import { AgentSuggestedPlaceCard } from './AgentSuggestedPlaceCard'
+import { AgentPlaceListCard } from './AgentPlaceListCard'
 import { AgentDayPlanCard } from './AgentDayPlanCard'
 import { AgentToolCallCard } from './AgentToolCallCard'
 import ReactMarkdown from 'react-markdown'
@@ -258,11 +258,7 @@ export function AgentPanel() {
                       </div>
 
                       {msg.metadata?.suggestedPlaces && msg.metadata.suggestedPlaces.length > 0 && (
-                        <div className="mt-2 space-y-2">
-                          {msg.metadata.suggestedPlaces.map((place, i) => (
-                            <AgentSuggestedPlaceCard key={i} index={i} {...place} />
-                          ))}
-                        </div>
+                        <AgentPlaceListCard places={msg.metadata.suggestedPlaces} />
                       )}
 
                       {msg.metadata?.tripId && (

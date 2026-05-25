@@ -15,33 +15,70 @@ _mcp_tools: list[BaseTool] = []
 _MCP_MAX_RETRIES = 3
 _MCP_RETRY_DELAY = 1.0
 
+# Transient error patterns — checked against both str(e) and type name
+_TRANSIENT_ERROR_TYPES = (
+    "RemoteProtocolError",
+    "ConnectError",
+    "ConnectTimeout",
+    "ReadTimeout",
+    "WriteTimeout",
+    "PoolTimeout",
+    "ConnectionNotAvailable",
+)
+
+_TRANSIENT_ERROR_MSGS = [
+    "peer closed connection",
+    "connection reset",
+    "broken pipe",
+    "incompleteread",
+    "server disconnected",
+    "connection refused",
+    "connection closed",
+    "eof occurred",
+]
+
+
+def _is_transient_error(e: Exception) -> bool:
+    """Check if an exception is a transient network error worth retrying."""
+    type_name = type(e).__name__
+    if any(t in type_name for t in _TRANSIENT_ERROR_TYPES):
+        return True
+    error_str = str(e).lower()
+    return any(msg in error_str for msg in _TRANSIENT_ERROR_MSGS)
+
 
 def _wrap_tool_with_retry(tool: BaseTool) -> BaseTool:
-    """Wrap an MCP tool with retry logic for transient network errors."""
+    """Wrap an MCP tool with retry logic for transient network errors.
+
+    On exhausted retries, raises ToolException so LangGraph's
+    handle_tool_errors=True can gracefully report the failure to the LLM
+    instead of crashing the agent loop.
+    """
     original_arun = tool.arun
+    tool_name = tool.name
 
     async def arun_with_retry(*args: Any, **kwargs: Any) -> Any:
         last_error: Exception | None = None
         for attempt in range(_MCP_MAX_RETRIES):
             try:
                 return await original_arun(*args, **kwargs)
+            except ToolException:
+                # Already a ToolException — don't wrap or retry
+                raise
             except Exception as e:
                 last_error = e
-                error_str = str(e).lower()
-                # Only retry on transient network errors
-                is_transient = any(msg in error_str for msg in [
-                    "peer closed connection",
-                    "remoteprotocolerror",
-                    "connection reset",
-                    "broken pipe",
-                    "incompleteread",
-                ])
-                if not is_transient or attempt == _MCP_MAX_RETRIES - 1:
-                    raise
+                if not _is_transient_error(e) or attempt == _MCP_MAX_RETRIES - 1:
+                    # Non-transient or last attempt: wrap in ToolException
+                    # so the agent can handle it gracefully
+                    logger.error("mcp", f"MCP tool '{tool_name}' failed (attempt {attempt + 1}/{_MCP_MAX_RETRIES}): {e}")
+                    raise ToolException(
+                        f"工具 '{tool_name}' 调用失败: {e}"
+                    ) from e
                 delay = _MCP_RETRY_DELAY * (2 ** attempt)
-                logger.warning("mcp", f"MCP tool '{tool.name}' attempt {attempt + 1} failed, retrying in {delay}s: {e}")
+                logger.warning("mcp", f"MCP tool '{tool_name}' attempt {attempt + 1}/{_MCP_MAX_RETRIES} failed, retrying in {delay}s: {e}")
                 await asyncio.sleep(delay)
-        raise last_error  # type: ignore[misc]
+        # Should not reach here, but just in case
+        raise ToolException(f"工具 '{tool_name}' 调用失败: {last_error}") from last_error
 
     object.__setattr__(tool, 'arun', arun_with_retry)
     return tool

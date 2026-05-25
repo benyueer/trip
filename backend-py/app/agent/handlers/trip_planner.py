@@ -14,7 +14,7 @@ from app.agent.tool_registry import ToolRegistry
 from app.config import settings
 from app.logger import logger
 
-from app.agent.compressor import compress_history, compress_tool_result
+from app.agent.compressor import compress_tool_result
 
 
 async def handle_trip_planner(
@@ -32,14 +32,8 @@ async def handle_trip_planner(
     # Save user message
     await message_manager.save_message(session_id, "user", user_message)
 
-    # Load history, compress if needed, and build prompt
-    history = await message_manager.load_history(session_id)
-    if len(history) > settings.agent_history_threshold:
-        old_count = len(history) - settings.agent_history_keep_recent
-        history = await compress_history(history)
-        for msg in history:
-            if msg.id == "summary":
-                await message_manager.save_summary(session_id, msg.content, old_count)
+    # Load history (auto-compressed if too long) and build prompt
+    history = await message_manager.load_compressed_history(session_id)
     system_prompt = await prompt_builder.build(user_id, intent="trip_planner", current_trip_id=current_trip_id)
 
     # Get filtered tools for this intent
@@ -67,39 +61,44 @@ async def handle_trip_planner(
             version="v2",
             config={"recursion_limit": 50},
         ):
-            kind = event["event"]
+            try:
+                kind = event["event"]
 
-            if kind == "on_chat_model_stream":
-                chunk = event["data"]["chunk"]
-                if chunk.content:
-                    token_buffer.append(chunk.content)
-                    yield json.dumps({"type": "token", "content": chunk.content}, ensure_ascii=False) + "\n"
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    if chunk.content:
+                        token_buffer.append(chunk.content)
+                        yield json.dumps({"type": "token", "content": chunk.content}, ensure_ascii=False) + "\n"
 
-            elif kind == "on_tool_start":
-                tool_name = event.get("name", "unknown")
-                tool_input = event.get("data", {}).get("input", {})
-                tool_call_id = event.get("run_id", "")
-                logger.agent.tool_call(tool_name, tool_input)
-                yield json.dumps({
-                    "type": "tool_start",
-                    "tool": tool_name,
-                    "input": tool_input,
-                    "toolCallId": tool_call_id,
-                }, ensure_ascii=False) + "\n"
-
-            elif kind == "on_tool_end":
-                output = event.get("data", {}).get("output", "")
-                tool_name = event.get("name", "unknown")
-                tool_call_id = event.get("run_id", "")
-                if output is not None:
-                    tool_results_buffer.append(output)
-                    output_str = compress_tool_result(output)
+                elif kind == "on_tool_start":
+                    tool_name = event.get("name", "unknown")
+                    tool_input = event.get("data", {}).get("input", {})
+                    tool_call_id = event.get("run_id", "")
+                    logger.agent.tool_call(tool_name, tool_input)
                     yield json.dumps({
-                        "type": "tool_end",
+                        "type": "tool_start",
                         "tool": tool_name,
+                        "input": tool_input,
                         "toolCallId": tool_call_id,
-                        "output": output_str,
                     }, ensure_ascii=False) + "\n"
+
+                elif kind == "on_tool_end":
+                    output = event.get("data", {}).get("output", "")
+                    tool_name = event.get("name", "unknown")
+                    tool_call_id = event.get("run_id", "")
+                    if output is not None:
+                        tool_results_buffer.append(output)
+                        output_str = compress_tool_result(output)
+                        yield json.dumps({
+                            "type": "tool_end",
+                            "tool": tool_name,
+                            "toolCallId": tool_call_id,
+                            "output": output_str,
+                        }, ensure_ascii=False) + "\n"
+            except Exception as event_err:
+                logger.error("agent", f"Event processing error in trip_planner: {event_err}")
+                yield json.dumps({"type": "token", "content": f"\n\n[工具调用异常: {event_err}]\n"}, ensure_ascii=False) + "\n"
+                continue
     except Exception as e:
         logger.error("agent", f"Stream error in trip_planner: {e}")
         error_msg = "\n\n抱歉，处理过程中出现错误，请重试。"

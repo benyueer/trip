@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTripStore } from '../store'
 import MapContainer from '../components/MapContainer'
@@ -10,8 +10,24 @@ import { ArrowLeft, Loader2, Share2, Bot } from 'lucide-react'
 const TripDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { fetchTripById, currentTrip, loading, user, setAgentPanelOpen, isAgentPanelOpen } = useTripStore()
+  const { fetchTripById, currentTrip, loading, user, setAgentPanelOpen, isAgentPanelOpen, updateCurrentTrip } = useTripStore()
   const [showShareModal, setShowShareModal] = useState(false)
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descValue, setDescValue] = useState('')
+  const descInputRef = useRef<HTMLTextAreaElement>(null)
+
+  const startEditDesc = () => {
+    setDescValue(currentTrip?.description || '')
+    setEditingDesc(true)
+    setTimeout(() => descInputRef.current?.focus(), 0)
+  }
+
+  const saveDesc = async () => {
+    if (descValue !== (currentTrip?.description || '')) {
+      await updateCurrentTrip({ description: descValue })
+    }
+    setEditingDesc(false)
+  }
 
   useEffect(() => {
     if (id) {
@@ -86,8 +102,31 @@ const TripDetailPage: React.FC = () => {
 
       <div className='absolute top-6 left-24 z-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-white max-w-sm'>
         <h1 className='text-lg font-bold text-gray-900'>{currentTrip.title}</h1>
-        {currentTrip.description && (
-          <p className='text-xs text-gray-500 mt-0.5 truncate'>{currentTrip.description}</p>
+        {editingDesc ? (
+          <div className='mt-1.5'>
+            <textarea
+              ref={descInputRef}
+              value={descValue}
+              onChange={e => setDescValue(e.target.value)}
+              onBlur={saveDesc}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDesc() }
+                if (e.key === 'Escape') setEditingDesc(false)
+              }}
+              className='w-full text-xs text-gray-700 bg-gray-50/80 border-0 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400/40 resize-none placeholder:text-gray-300 transition-shadow'
+              rows={2}
+              placeholder='添加行程描述...'
+            />
+            <p className='text-[10px] text-gray-300 mt-1 select-none'>Enter 保存 · Esc 取消</p>
+          </div>
+        ) : (
+          <p
+            onClick={startEditDesc}
+            className='text-xs text-gray-500 mt-0.5 cursor-text hover:text-gray-700 transition-colors line-clamp-2'
+            title='点击编辑描述'
+          >
+            {currentTrip.description || '点击添加描述...'}
+          </p>
         )}
       </div>
 

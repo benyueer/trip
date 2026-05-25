@@ -7,6 +7,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models import AgentMessage, AgentSession, _utcnow
 
 
@@ -56,6 +57,27 @@ class MessageManager:
             .limit(limit)
         )
         return list(reversed(result.scalars().all()))
+
+    async def load_compressed_history(
+        self, session_id: str, limit: int = 20
+    ) -> list[AgentMessage]:
+        """Load history and auto-compress if it exceeds the threshold.
+
+        When compressed, persists the summary as a system message so it
+        survives across turns. Returns the (possibly compressed) history.
+        """
+        from app.agent.compressor import compress_history
+
+        history = await self.load_history(session_id, limit)
+        if len(history) <= settings.agent_history_threshold:
+            return history
+
+        old_count = len(history) - settings.agent_history_keep_recent
+        history = await compress_history(history)
+        for msg in history:
+            if msg.id == "summary":
+                await self.save_summary(session_id, msg.content, old_count)
+        return history
 
     async def touch_session(self, session: AgentSession) -> None:
         session.updatedAt = _utcnow()

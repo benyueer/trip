@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getDayColor } from '../utils/dayColors'
 import {
   DndContext,
@@ -250,9 +250,30 @@ export default function FloatingPanel() {
     allPlacesLoading,
     fetchAllPlaces,
     setShowAllPlaces,
+    updateCurrentTrip,
   } = useTripStore()
 
   const [activeItem, setActiveItem] = useState<TripItem | null>(null)
+  const [editingDayDesc, setEditingDayDesc] = useState(false)
+  const [dayDescValue, setDayDescValue] = useState('')
+  const dayDescInputRef = useRef<HTMLTextAreaElement>(null)
+
+  const startEditDayDesc = () => {
+    setDayDescValue(activeDay?.description || '')
+    setEditingDayDesc(true)
+    setTimeout(() => dayDescInputRef.current?.focus(), 0)
+  }
+
+  const saveDayDesc = async () => {
+    if (!currentTrip || !activeDay) return
+    if (dayDescValue !== (activeDay.description || '')) {
+      const newDays = currentTrip.days.map(d =>
+        d.dayIndex === activeDayIndex ? { ...d, description: dayDescValue } : d
+      )
+      await updateCurrentTrip({ days: newDays })
+    }
+    setEditingDayDesc(false)
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -265,6 +286,11 @@ export default function FloatingPanel() {
       if (!exists) setActiveDayIndex(days[0].dayIndex)
     }
   }, [days, activeDayIndex, setActiveDayIndex])
+
+  // 切换天数时退出编辑状态
+  useEffect(() => {
+    setEditingDayDesc(false)
+  }, [activeDayIndex])
 
   const allPlaces = days.flatMap(d => d.items).filter(i => i.type === 'place') as Place[]
   const activeDay = days.find(d => d.dayIndex === activeDayIndex)
@@ -391,8 +417,31 @@ export default function FloatingPanel() {
               />
             ))}
           </div>
-          {activeDay?.description && (
-            <p className='text-xs text-gray-400 mt-1.5 px-1'>{activeDay.description}</p>
+          {editingDayDesc ? (
+            <div className='mt-1.5 px-1'>
+              <textarea
+                ref={dayDescInputRef}
+                value={dayDescValue}
+                onChange={e => setDayDescValue(e.target.value)}
+                onBlur={saveDayDesc}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDayDesc() }
+                  if (e.key === 'Escape') setEditingDayDesc(false)
+                }}
+                className='w-full text-xs text-gray-700 bg-white border border-gray-100 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-200 resize-none placeholder:text-gray-300 transition-all shadow-sm'
+                rows={2}
+                placeholder='添加当天描述...'
+              />
+              <p className='text-[10px] text-gray-300 mt-1 select-none'>Enter 保存 · Esc 取消</p>
+            </div>
+          ) : (
+            <p
+              onClick={startEditDayDesc}
+              className='text-xs text-gray-400 mt-1.5 px-1 cursor-text hover:text-gray-600 transition-colors'
+              title='点击编辑描述'
+            >
+              {activeDay?.description || (isEditMode ? '点击添加当天描述...' : '')}
+            </p>
           )}
         </div>
 

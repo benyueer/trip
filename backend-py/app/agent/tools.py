@@ -367,6 +367,12 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         logger.info("tools", f'planDayRoute(day{day_index}, "{title}") → {len(mapped_places)} places, {len(routes)} routes')
         return {"status": "plan_ready", "plan": plan, "message": f"已为您规划第{day_index}天的行程，请查看方案并选择接受或拒绝。"}
 
+    @tool("returnPlaces")
+    async def return_places_(places: list[dict]) -> dict:
+        """Submit the final merged place list. Must be called as the last step after searching and deduplicating places. Each place must have: name (string), lngLat ([number, number]), and optionally: description, category, address, rating, ticket, openingHours, phone, notes."""
+        logger.agent.tool_call("returnPlaces", {"count": len(places)})
+        return {"suggested_places": places, "count": len(places)}
+
     tools_list = [
         web_search,
         query_local_places,
@@ -374,6 +380,7 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         create_trip_plan_,
         modify_trip_plan_,
         plan_day_route_,
+        return_places_,
     ]
 
     # Tag tools with the intents they serve
@@ -383,5 +390,6 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
     create_trip_plan_._intent_tags = ["trip_planner"]
     modify_trip_plan_._intent_tags = ["trip_planner"]
     plan_day_route_._intent_tags = ["trip_planner"]
+    return_places_._intent_tags = ["place_search"]
 
     return tools_list
