@@ -57,7 +57,7 @@ const PlanningListPage: React.FC = () => {
   }
 
   return (
-    <div className='min-h-screen bg-gray-50 p-4 sm:p-8'>
+    <div className='w-full h-full overflow-y-auto bg-gray-50 p-4 sm:p-8'>
       <div className='max-w-4xl mx-auto'>
         <header className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 mb-8 sm:mb-12'>
           <div>
