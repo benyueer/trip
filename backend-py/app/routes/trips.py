@@ -94,21 +94,33 @@ async def get_all_trips(
     db_session: AsyncSession,
 ) -> list[dict]:
     user_id = request.user["id"]
+    is_guest = request.user.get("provider") == "guest"
 
-    subquery = select(TripShare.tripId).where(TripShare.userId == user_id).scalar_subquery()
-    result = await db_session.execute(
-        select(Trip)
-        .outerjoin(TripShare, TripShare.tripId == Trip.id)
-        .where(
-            (Trip.ownerId == user_id) | (Trip.id.in_(subquery))
+    if is_guest:
+        # 游客模式下查阅系统中的所有行程
+        result = await db_session.execute(
+            select(Trip)
+            .options(
+                selectinload(Trip.owner),
+                selectinload(Trip.days).selectinload(Day.items),
+            )
+            .order_by(Trip.updatedAt.desc())
         )
-        .options(
-            selectinload(Trip.owner),
-            selectinload(Trip.days).selectinload(Day.items),
+    else:
+        subquery = select(TripShare.tripId).where(TripShare.userId == user_id).scalar_subquery()
+        result = await db_session.execute(
+            select(Trip)
+            .outerjoin(TripShare, TripShare.tripId == Trip.id)
+            .where(
+                (Trip.ownerId == user_id) | (Trip.id.in_(subquery))
+            )
+            .options(
+                selectinload(Trip.owner),
+                selectinload(Trip.days).selectinload(Day.items),
+            )
+            .order_by(Trip.updatedAt.desc())
+            .distinct()
         )
-        .order_by(Trip.updatedAt.desc())
-        .distinct()
-    )
     trips = result.scalars().all()
     return [_serialize_trip(t) for t in trips]
 
@@ -119,19 +131,29 @@ async def get_all_places(
     db_session: AsyncSession,
 ) -> list[dict]:
     user_id = request.user["id"]
+    is_guest = request.user.get("provider") == "guest"
 
-    shared_trip_ids_subq = select(TripShare.tripId).where(TripShare.userId == user_id).scalar_subquery()
-
-    result = await db_session.execute(
-        select(Item)
-        .join(Day, Day.id == Item.dayId)
-        .join(Trip, Trip.id == Day.tripId)
-        .where(
-            (Item.type == "place") &
-            ((Trip.ownerId == user_id) | (Trip.id.in_(shared_trip_ids_subq)))
+    if is_guest:
+        # 游客模式下直接返回系统内所有的地点
+        result = await db_session.execute(
+            select(Item)
+            .join(Day, Day.id == Item.dayId)
+            .join(Trip, Trip.id == Day.tripId)
+            .where(Item.type == "place")
+            .options(selectinload(Item.day).selectinload(Day.trip))
         )
-        .options(selectinload(Item.day).selectinload(Day.trip))
-    )
+    else:
+        shared_trip_ids_subq = select(TripShare.tripId).where(TripShare.userId == user_id).scalar_subquery()
+        result = await db_session.execute(
+            select(Item)
+            .join(Day, Day.id == Item.dayId)
+            .join(Trip, Trip.id == Day.tripId)
+            .where(
+                (Item.type == "place") &
+                ((Trip.ownerId == user_id) | (Trip.id.in_(shared_trip_ids_subq)))
+            )
+            .options(selectinload(Item.day).selectinload(Day.trip))
+        )
     items = result.scalars().all()
 
     return [
@@ -176,7 +198,8 @@ async def get_trip_by_id(
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Trip not found")
 
     is_owner = trip.ownerId == user_id
-    if not is_owner:
+    is_guest = request.user.get("provider") == "guest"
+    if not is_owner and not is_guest:
         share_result = await db_session.execute(
             select(TripShare).where(
                 (TripShare.tripId == trip_id) & (TripShare.userId == user_id)
