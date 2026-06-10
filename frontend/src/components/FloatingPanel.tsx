@@ -19,21 +19,48 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useDroppable } from '@dnd-kit/core'
 import { useTripStore, type TripItem, type Place, type CachedPlace } from '../store'
-import { Plus, Trash2, MapPin, Navigation, GripVertical, Star, Car, Bike, Footprints, Pencil, X } from 'lucide-react'
+import { Plus, Trash2, MapPin, Navigation, GripVertical, Star, Car, Bike, Footprints, Pencil, X, Plane, Train } from 'lucide-react'
 
 // ---- 单个可拖拽卡片 ----
-// 根据路线名称匹配交通工具图标
-const getRouteIcon = (name: string) => {
-  const lower = name.toLowerCase()
-  if (lower.includes('驾车') || lower.includes('driving') || lower.includes('car')) {
+// 根据路线类型或名称匹配交通工具图标
+const getRouteIcon = (category?: string, name?: string) => {
+  const cat = category || ''
+  if (cat.includes('驾车') || cat.includes('Car') || cat.includes('Driving')) {
     return <Car size={12} />
   }
-  if (lower.includes('骑行') || lower.includes('riding') || lower.includes('bike') || lower.includes('cycling')) {
+  if (cat.includes('骑行') || cat.includes('非机动车') || cat.includes('Bike') || cat.includes('Riding') || cat.includes('cycling')) {
     return <Bike size={12} />
   }
-  if (lower.includes('步行') || lower.includes('walking') || lower.includes('walk')) {
+  if (cat.includes('步行') || cat.includes('Walk') || cat.includes('Footprints') || cat.includes('walking')) {
     return <Footprints size={12} />
   }
+  if (cat.includes('飞机') || cat.includes('Flight') || cat.includes('Plane')) {
+    return <Plane size={12} />
+  }
+  if (cat.includes('铁路') || cat.includes('火车') || cat.includes('Train') || cat.includes('Railway')) {
+    return <Train size={12} />
+  }
+
+  // 兜底策略：如果 category 为空，则从路线名称中查找
+  if (name) {
+    const lower = name.toLowerCase()
+    if (lower.includes('驾车') || lower.includes('driving') || lower.includes('car')) {
+      return <Car size={12} />
+    }
+    if (lower.includes('骑行') || lower.includes('riding') || lower.includes('bike') || lower.includes('cycling') || lower.includes('非机动车')) {
+      return <Bike size={12} />
+    }
+    if (lower.includes('步行') || lower.includes('walking') || lower.includes('walk')) {
+      return <Footprints size={12} />
+    }
+    if (lower.includes('飞机') || lower.includes('flight') || lower.includes('plane') || lower.includes('航空')) {
+      return <Plane size={12} />
+    }
+    if (lower.includes('铁路') || lower.includes('火车') || lower.includes('train') || lower.includes('高铁') || lower.includes('动车')) {
+      return <Train size={12} />
+    }
+  }
+
   return <Navigation size={12} className='transform rotate-45' />
 }
 
@@ -46,14 +73,16 @@ function SortableItemCard({
   dayColor,
   onHighlight,
   onDelete,
+  onEdit,
 }: {
   item: TripItem
   isHighlight: boolean
   isEditMode: boolean
-  activeDayIndex: number
+  activeDayIndex: number | null
   dayColor: { bg: string; text: string; border: string }
   onHighlight: () => void
   onDelete: () => void
+  onEdit: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -106,7 +135,7 @@ function SortableItemCard({
             >
               <MapPin size={18} />
             </div>
-            <div className='flex flex-col min-w-0 flex-1'>
+            <div className={`flex flex-col min-w-0 flex-1 ${isEditMode ? 'pr-20' : ''}`}>
               <div className='flex items-center justify-between gap-2'>
                 <span className={`font-bold text-sm truncate ${isHighlight ? 'text-blue-900' : 'text-gray-800'}`}>{item.name}</span>
                 {item.type === 'place' && (item as any).rating && (
@@ -154,28 +183,39 @@ function SortableItemCard({
                   ${isHighlight ? '' : 'bg-gray-400 group-hover:bg-blue-500'}`}
                 style={isHighlight ? { background: dayColor.text } : {}}
               >
-                {getRouteIcon(item.name)}
+                {getRouteIcon((item as any).category, item.name)}
               </div>
             </div>
 
             {/* 右侧路线信息 */}
-            <div className='flex flex-col min-w-0 flex-1 justify-center'>
+            <div className={`flex flex-col min-w-0 flex-1 justify-center ${isEditMode ? 'pr-20' : ''}`}>
               <span className={`font-bold text-xs ${isHighlight ? 'text-blue-900' : 'text-gray-500'} truncate`}>
                 {item.name}
               </span>
               <span className='text-[10px] text-gray-400 mt-0.5 font-medium'>
-                路线：{(item as any).distance}{(item as any).duration ? ` · ${(item as any).duration}` : ''}
+                {(item as any).category ? `${(item as any).category}：` : '路线：'}{(item as any).distance}{(item as any).duration ? ` · ${(item as any).duration}` : ''}
               </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* 删除按钮（编辑模式 hover 显示） */}
+      {/* 编辑按钮（编辑模式 hover 显示，移动端常态显示） */}
+      {isEditMode && (
+        <button
+          onClick={e => { e.stopPropagation(); onEdit() }}
+          className='absolute right-12 top-1/2 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all z-20'
+          title='编辑'
+        >
+          <Pencil size={16} />
+        </button>
+      )}
+
+      {/* 删除按钮（编辑模式 hover 显示，移动端常态显示） */}
       {isEditMode && (
         <button
           onClick={e => { e.stopPropagation(); onDelete() }}
-          className='absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all z-20'
+          className='absolute right-3 top-1/2 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all z-20'
           title='删除'
         >
           <Trash2 size={16} />
@@ -222,6 +262,7 @@ function DroppableDayTab({
   onDelete,
   isDragging,
   isGuest,
+  isEditMode,
 }: {
   dayIndex: number
   isActive: boolean
@@ -230,6 +271,7 @@ function DroppableDayTab({
   onDelete: () => void
   isDragging: boolean
   isGuest: boolean
+  isEditMode: boolean
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `day-tab-${dayIndex}` })
   const color = getDayColor(dayIndex)
@@ -248,7 +290,7 @@ function DroppableDayTab({
           : {}}
     >
       Day {dayIndex}
-      {isActive && canDelete && !isGuest && (
+      {isActive && canDelete && !isGuest && isEditMode && (
         <button
           onClick={e => { e.stopPropagation(); onDelete() }}
           className='p-0.5 hover:bg-red-50 hover:text-red-500 rounded-md transition-colors'
@@ -349,7 +391,7 @@ export default function FloatingPanel({
 
   // 当天数变化时调整激活索引
   useEffect(() => {
-    if (days.length > 0) {
+    if (days.length > 0 && activeDayIndex !== null) {
       const exists = days.some(d => d.dayIndex === activeDayIndex)
       if (!exists) setActiveDayIndex(days[0].dayIndex)
     }
@@ -415,7 +457,7 @@ export default function FloatingPanel({
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveItem(null)
-    if (!over) return
+    if (!over || activeDayIndex === null) return
 
     const activeId = active.id as string
     const overId = over.id as string
@@ -504,12 +546,12 @@ export default function FloatingPanel({
                 {allPlacesCache?.some(p => p.id === highlightedPlace.id) && !days.some(d => d.items.some(i => i.id === highlightedPlace.id)) ? (
                   <button
                     onClick={() => {
-                      useTripStore.getState().addSuggestedPlaceToTrip(highlightedPlace as any, activeDayIndex)
+                      useTripStore.getState().addSuggestedPlaceToTrip(highlightedPlace as any, activeDayIndex ?? undefined)
                       setMobileView?.('list') // 添加后跳转列表视图
                     }}
                     className='flex-1 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-sm hover:bg-blue-700 transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer'
                   >
-                    <Plus size={12} /> 加入行程 (Day {activeDayIndex})
+                    <Plus size={12} /> 加入行程 {activeDayIndex !== null ? `(Day ${activeDayIndex})` : ''}
                   </button>
                 ) : (
                   <>
@@ -518,7 +560,7 @@ export default function FloatingPanel({
                         onClick={() => {
                           setEditingItem({
                             type: 'edit',
-                            dayIndex: days.find(d => d.items.some(i => i.id === highlightedPlace.id))?.dayIndex || activeDayIndex,
+                            dayIndex: days.find(d => d.items.some(i => i.id === highlightedPlace.id))?.dayIndex || (activeDayIndex ?? 1),
                             item: highlightedPlace,
                           })
                         }}
@@ -604,7 +646,8 @@ export default function FloatingPanel({
                 canDelete={days.length > 1}
                 isDragging={isDragging}
                 isGuest={isGuest}
-                onActivate={() => setActiveDayIndex(day.dayIndex)}
+                isEditMode={isEditMode}
+                onActivate={() => setActiveDayIndex(activeDayIndex === day.dayIndex ? null : day.dayIndex)}
                 onDelete={() => { if (confirm(`确定要删除第 ${day.dayIndex} 天吗？`)) deleteDay(day.dayIndex) }}
               />
             ))}
@@ -683,10 +726,11 @@ export default function FloatingPanel({
                   </select>
                 </div>
                 {routingStartItem && routingEndItem && (
-                  <div className='mt-2 pt-2 border-t border-indigo-200/50 flex gap-2'>
-                    <button onClick={() => calculateAndAddRoute(activeDayIndex, routingStartItem, routingEndItem, 'Driving')} className='flex-1 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition'>驾车</button>
-                    <button onClick={() => calculateAndAddRoute(activeDayIndex, routingStartItem, routingEndItem, 'Walking')} className='flex-1 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition'>步行</button>
-                    <button onClick={() => calculateAndAddRoute(activeDayIndex, routingStartItem, routingEndItem, 'Riding')} className='flex-1 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition'>骑行</button>
+                  <div className='mt-2 pt-2 border-t border-indigo-200/50 grid grid-cols-4 gap-2'>
+                    <button onClick={() => calculateAndAddRoute(activeDayIndex ?? 1, routingStartItem, routingEndItem, 'Driving')} className='py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-xs font-bold text-center cursor-pointer'>驾车</button>
+                    <button onClick={() => calculateAndAddRoute(activeDayIndex ?? 1, routingStartItem, routingEndItem, 'Walking')} className='py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-xs font-bold text-center cursor-pointer'>步行</button>
+                    <button onClick={() => calculateAndAddRoute(activeDayIndex ?? 1, routingStartItem, routingEndItem, 'Riding')} className='py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-xs font-bold text-center cursor-pointer'>骑行</button>
+                    <button onClick={() => calculateAndAddRoute(activeDayIndex ?? 1, routingStartItem, routingEndItem, 'Flight')} className='py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-xs font-bold text-center cursor-pointer'>飞机</button>
                   </div>
                 )}
               </div>
@@ -779,7 +823,7 @@ export default function FloatingPanel({
                             category: place.category,
                             notes: place.notes
                           }
-                          addPlace(activeDayIndex, clonedPlace)
+                          addPlace(activeDayIndex!, clonedPlace)
                           setIsAddingPlace(false)
                           setPlaceSearchQuery('')
                         }}
@@ -818,11 +862,11 @@ export default function FloatingPanel({
           )}
 
           {!activeDay ? (
-            <div className='h-full flex flex-col items-center justify-center text-gray-400 gap-3'>
-              <div className='w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center border border-gray-100'>
-                <Plus size={32} className='opacity-20' />
+            <div className='h-full flex flex-col items-center justify-center text-gray-400 gap-3 py-12'>
+              <div className='w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center border border-gray-100 animate-pulse'>
+                <MapPin size={32} className='text-blue-500/60' />
               </div>
-              <p className='text-sm'>点击上方"+"开始规划</p>
+              <p className='text-sm font-medium text-gray-500'>请选择具体天数查看行程</p>
             </div>
           ) : (
             <div className='flex flex-col gap-3'>
@@ -844,7 +888,7 @@ export default function FloatingPanel({
                     isHighlight={highlightedId === item.id}
                     isEditMode={isEditMode}
                     activeDayIndex={activeDayIndex}
-                    dayColor={getDayColor(activeDayIndex)}
+                    dayColor={getDayColor(activeDayIndex!)}
                     onHighlight={() => {
                       setHighlightedId(item.id)
                       if (isMobile) {
@@ -852,7 +896,14 @@ export default function FloatingPanel({
                       }
                     }}
                     onDelete={() => {
-                      if (confirm(`确定要删除 ${item.name} 吗？`)) deleteItem(activeDayIndex, item.id)
+                      if (confirm(`确定要删除 ${item.name} 吗？`)) deleteItem(activeDayIndex!, item.id)
+                    }}
+                    onEdit={() => {
+                      setEditingItem({
+                        type: 'edit',
+                        dayIndex: activeDayIndex!,
+                        item: item,
+                      })
                     }}
                   />
                 ))}

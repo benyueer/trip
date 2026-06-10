@@ -3,6 +3,21 @@ import axios from 'axios'
 
 const genId = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 
+const getDistance = (lngLat1: [number, number], lngLat2: [number, number]): string => {
+  const [lng1, lat1] = lngLat1
+  const [lng2, lat2] = lngLat2
+  const R = 6371 // 地球半径，单位公里
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const d = R * c
+  return d > 1 ? `${d.toFixed(1)}公里` : `${(d * 1000).toFixed(0)}米`
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL}/api`
   : '/api'
@@ -30,6 +45,7 @@ export interface Route {
   name: string
   distance: string
   duration?: string
+  category?: string
   path: [number, number][]
 }
 
@@ -54,7 +70,7 @@ export interface Trip {
 export interface EditingItem {
   type: 'add' | 'edit'
   dayIndex: number
-  item?: Partial<Place>
+  item?: Partial<TripItem>
   lngLat?: [number, number]
 }
 
@@ -152,7 +168,7 @@ export interface TripState {
   trips: Trip[]
   currentTrip: Trip | null
   highlightedId: string | null
-  activeDayIndex: number
+  activeDayIndex: number | null
   loading: boolean
   isEditMode: boolean
   editingItem: EditingItem | null
@@ -179,7 +195,7 @@ export interface TripState {
   deleteDay: (dayIndex: number) => Promise<void>
 
   setHighlightedId: (id: string | null) => void
-  setActiveDayIndex: (index: number) => void
+  setActiveDayIndex: (index: number | null) => void
   setIsEditMode: (isEditMode: boolean) => void
   setEditingItem: (item: EditingItem | null) => void
 
@@ -386,6 +402,35 @@ export const useTripStore = create<TripState>((set, get) => ({
 
     set({ loading: true })
     try {
+      if (mode === 'Flight') {
+        const flightRoute: Route = {
+          id: genId(),
+          type: 'route',
+          name: `${startPlace.name} 到 ${endPlace.name} (飞机)`,
+          distance: getDistance(startPlace.lngLat, endPlace.lngLat),
+          duration: '根据航班而定',
+          category: '飞机',
+          path: [startPlace.lngLat, endPlace.lngLat]
+        }
+        const newDays = currentTrip.days.map(d => {
+          if (d.dayIndex === dayIndex) {
+            const items = [...d.items]
+            const startIndex = items.findIndex(item => item.id === startPlace.id)
+            if (startIndex !== -1) {
+              items.splice(startIndex + 1, 0, flightRoute)
+            } else {
+              items.push(flightRoute)
+            }
+            return { ...d, items }
+          }
+          return d
+        })
+        await get().updateCurrentTrip({ days: newDays })
+        get().cancelRouting()
+        set({ loading: false })
+        return
+      }
+
       const modeName = mode === 'Driving' ? '驾车' : mode === 'Walking' ? '步行' : '骑行'
       const name = `${startPlace.name} 到 ${endPlace.name} (${modeName})`
 
@@ -473,10 +518,15 @@ export const useTripStore = create<TripState>((set, get) => ({
     const day = currentTrip.days.find(d => d.dayIndex === dayIndex)
     if (!day) return
 
-    // 1. 过滤出所有的地点，丢弃路线
+    // 1. 过滤出所有的地点
     const places = day.items.filter(item => item.type === 'place') as Place[]
 
-    // 2. 本地即时清理路线并保存
+    // 2. 在清理当前天路线前，首先收集整个行程中所有原有的路线（用于复用）
+    const originalRoutes = currentTrip.days
+      .flatMap(d => d.items)
+      .filter(item => item.type === 'route') as Route[]
+
+    // 3. 本地即时清理当前天路线并保存（过渡状态）
     const updatedDays = currentTrip.days.map(d => {
       if (d.dayIndex === dayIndex) {
         return { ...d, items: [...places] }
@@ -493,46 +543,132 @@ export const useTripStore = create<TripState>((set, get) => ({
       return
     }
 
-    // 3. 顺次向后端请求路线，并交织插入 items 数组
+    // 4. 经纬度相近判定函数
+    const isLocationClose = (l1: [number, number], l2: [number, number]) => {
+      if (!l1 || !l2) return false
+      return Math.abs(l1[0] - l2[0]) < 0.0002 && Math.abs(l1[1] - l2[1]) < 0.0002
+    }
+
+    // 5. 顺次构建新的 items 数组，自动复用或重新请求生成路线
     const finalItems: TripItem[] = [places[0]]
+    let latestDays = [...updatedDays]
 
     for (let i = 0; i < places.length - 1; i++) {
       const start = places[i]
       const end = places[i + 1]
-      try {
-        const mode = 'Driving'
-        const modeName = '驾车'
-        const name = `${start.name} 到 ${end.name} (${modeName})`
 
-        const response = await axios.post(`${API_BASE_URL}/trips/${currentTrip.id}/days/${dayIndex}/routes`, {
-          routeId: genId(),
-          startLngLat: start.lngLat,
-          endLngLat: end.lngLat,
-          mode,
-          name
-        }, { withCredentials: true })
+      // 6. 尝试在所有原有路线中寻找起终点非常相近的复用路线
+      const reusableRoute = originalRoutes.find(r => {
+        if (!r.path || r.path.length < 2) return false
+        const startMatch = isLocationClose(r.path[0], start.lngLat)
+        const endMatch = isLocationClose(r.path[r.path.length - 1], end.lngLat)
+        return startMatch && endMatch
+      })
 
-        const newTrip = response.data
-        const dayFromNewTrip = newTrip.days.find((d: any) => d.dayIndex === dayIndex)
-        // 找到最新追加的 route 节点
-        const addedRoute = dayFromNewTrip?.items.find((item: any) => item.type === 'route' && !finalItems.some(f => f.id === item.id))
+      if (reusableRoute) {
+        finalItems.push(reusableRoute)
+      } else {
+        // 7. 找不到可复用路线时，检查原本当天这两个地点之间是否曾有飞机等路线
+        const originalItems = day.items
+        const startIndex = originalItems.findIndex(item => item.id === start.id)
+        const endIndex = originalItems.findIndex(item => item.id === end.id)
+        let isOriginalFlight = false
+        let originalFlightItem: any = null
 
-        if (addedRoute) {
-          finalItems.push(addedRoute)
+        if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+          const betweenItems = originalItems.slice(startIndex + 1, endIndex)
+          originalFlightItem = betweenItems.find(item => 
+            item.type === 'route' && 
+            ((item as any).category === '飞机' || item.name.includes('飞机') || item.name.toLowerCase().includes('flight'))
+          )
+          if (originalFlightItem) {
+            isOriginalFlight = true
+          }
         }
-      } catch (err) {
-        console.error('Auto routing failed:', err)
+
+        if (isOriginalFlight) {
+          const routeId = originalFlightItem.id || genId()
+          const dist = getDistance(start.lngLat, end.lngLat)
+          const flightRoute: Route = {
+            id: routeId,
+            type: 'route',
+            name: originalFlightItem.name || `${start.name} 到 ${end.name} (飞机)`,
+            distance: dist,
+            duration: originalFlightItem.duration || '根据航班而定',
+            category: '飞机',
+            path: [start.lngLat, end.lngLat]
+          }
+          finalItems.push(flightRoute)
+        } else {
+          // 8. 缺失路线，自动向后端请求生成新路线
+          try {
+            const mode = 'Driving'
+            const modeName = '驾车'
+            const name = `${start.name} 到 ${end.name} (${modeName})`
+
+            const newRouteId = genId()
+            const response = await axios.post(`${API_BASE_URL}/trips/${currentTrip.id}/days/${dayIndex}/routes`, {
+              routeId: newRouteId,
+              startLngLat: start.lngLat,
+              endLngLat: end.lngLat,
+              mode,
+              name
+            }, { withCredentials: true })
+
+            const newTrip = response.data
+            latestDays = newTrip.days
+            
+            const dayFromNewTrip = newTrip.days.find((d: any) => d.dayIndex === dayIndex)
+            const addedRoute = dayFromNewTrip?.items.find((item: any) => item.id === newRouteId)
+
+            if (addedRoute) {
+              finalItems.push(addedRoute)
+            } else {
+              // 兜底
+              const fallbackRoute: Route = {
+                id: newRouteId,
+                type: 'route',
+                name: `${start.name} 到 ${end.name} (驾车-自动规划)`,
+                distance: getDistance(start.lngLat, end.lngLat),
+                duration: '计算中',
+                category: '驾车',
+                path: [start.lngLat, end.lngLat]
+              }
+              finalItems.push(fallbackRoute)
+            }
+          } catch (err) {
+            console.error('Auto routing failed:', err)
+            const fallbackRoute: Route = {
+              id: genId(),
+              type: 'route',
+              name: `${start.name} 到 ${end.name} (驾车-连接失败)`,
+              distance: getDistance(start.lngLat, end.lngLat),
+              duration: '连接失败',
+              category: '驾车',
+              path: [start.lngLat, end.lngLat]
+            }
+            finalItems.push(fallbackRoute)
+          }
+        }
       }
       finalItems.push(places[i + 1])
     }
 
-    // 4. 将完整排好序、路线交叉好的数组再次更新提交给后端
-    const finalDays = currentTrip.days.map(d => {
+    // 9. 更新最新天数列表并写回后端保存
+    const finalDays = latestDays.map(d => {
       if (d.dayIndex === dayIndex) {
         return { ...d, items: finalItems }
       }
       return d
     })
+
+    set({
+      currentTrip: {
+        ...currentTrip,
+        days: finalDays
+      }
+    })
+    
     await updateCurrentTrip({ days: finalDays })
   },
 
@@ -888,7 +1024,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       return
     }
 
-    const targetDay = dayIndex ?? activeDayIndex
+    const targetDay = dayIndex ?? activeDayIndex ?? 1
     const newDays = [...currentTrip.days]
     let day = newDays.find(d => d.dayIndex === targetDay)
     if (!day) {

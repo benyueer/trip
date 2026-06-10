@@ -42,12 +42,13 @@ export default function MapContainer() {
   const [showDetailedMarkers, setShowDetailedMarkers] = useState(true)
   const [mapLayer, setMapLayer] = useState<'standard' | 'amap' | 'tianditu'>('standard')
 
-  const currentTrip = useTripStore((state) => state.currentTrip);
-  const days = currentTrip?.days || [];
-  const highlightedId = useTripStore((state) => state.highlightedId);
+  const currentTrip = useTripStore((state) => state.currentTrip)
+  const days = currentTrip?.days || []
+  const highlightedId = useTripStore((state) => state.highlightedId)
+  const activeDayIndex = useTripStore((state) => state.activeDayIndex)
   const { setHighlightedId, setEditingItem, showAllPlaces, allPlacesCache } =
-    useTripStore();
-  const agentSuggestedPlaces = useTripStore((state) => state.agentSuggestedPlaces);
+    useTripStore()
+  const agentSuggestedPlaces = useTripStore((state) => state.agentSuggestedPlaces)
   const agentPlanRoutes = useTripStore((state) => state.agentPlanRoutes);
   const agentSuggestedHoverId = useRef<string | null>(null);
 
@@ -103,9 +104,9 @@ export default function MapContainer() {
             isGuest,
           } = useTripStore.getState();
           
-          if (isGuest) return;
-          if (currentEditMode && !isRouting) {
-            const lngLat: [number, number] = [e.lnglat.getLng(), e.lnglat.getLat()];
+          if (isGuest) return
+          if (currentEditMode && !isRouting && currentDay !== null) {
+            const lngLat: [number, number] = [e.lnglat.getLng(), e.lnglat.getLat()]
             
             // 默认初始数据
             let name = "";
@@ -269,14 +270,17 @@ export default function MapContainer() {
 
     // 添加文字图标 Markers（按天使用主题色）
     places.forEach((place) => {
-      const isHighlighted = highlightedId === place.id;
+      const isHighlighted = highlightedId === place.id
       const { routingStartItem, routingEndItem, isRouting } =
-        useTripStore.getState();
+        useTripStore.getState()
 
       // 找到该地点所在的天，取对应主题色
       const placeDayIndex =
-        days.find((d) => d.items.some((i) => i.id === place.id))?.dayIndex ?? 1;
-      const color = getDayColor(placeDayIndex);
+        days.find((d) => d.items.some((i) => i.id === place.id))?.dayIndex ?? 1
+      const color = getDayColor(placeDayIndex)
+
+      const isCurrentDay = placeDayIndex === activeDayIndex
+      const dayOpacity = isCurrentDay ? 1.0 : 0.4
 
       // 由开关控制，非高亮的图标显示为小点
       const isSmallMode = !showDetailedMarkers
@@ -291,36 +295,37 @@ export default function MapContainer() {
             border-radius:50%; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             transition: all 0.3s;
+            opacity: ${dayOpacity};
           "></div>
-        `;
+        `
       } else {
         // 根据高亮/路线规划状态，动态生成 marker 样式
-        let bgColor = color.bg;
-        let textColor = color.text;
-        let border = `1px solid ${color.border}`;
-        let extraStyle = "";
+        let bgColor = color.bg
+        let textColor = color.text
+        let border = `1px solid ${color.border}`
+        let extraStyle = ''
 
         if (isHighlighted) {
-          bgColor = color.text;
-          textColor = "#fff";
-          border = "none";
+          bgColor = color.text
+          textColor = '#fff'
+          border = 'none'
           extraStyle =
-            "box-shadow: 0 4px 12px rgba(0,0,0,0.2); transform: scale(1.12); z-index: 100;";
+            'box-shadow: 0 4px 12px rgba(0,0,0,0.2); transform: scale(1.12); z-index: 100;'
         }
 
         if (isRouting) {
           if (routingStartItem?.id === place.id) {
-            bgColor = "#10b981";
-            textColor = "#fff";
-            border = "none";
+            bgColor = '#10b981'
+            textColor = '#fff'
+            border = 'none'
           } else if (routingEndItem?.id === place.id) {
-            bgColor = "#f43f5e";
-            textColor = "#fff";
-            border = "none";
+            bgColor = '#f43f5e'
+            textColor = '#fff'
+            border = 'none'
           } else {
-            bgColor = "#f1f5f9";
-            textColor = "#94a3b8";
-            border = "1px dashed #cbd5e1";
+            bgColor = '#f1f5f9'
+            textColor = '#94a3b8'
+            border = '1px dashed #cbd5e1'
           }
         }
 
@@ -336,23 +341,25 @@ export default function MapContainer() {
             white-space:nowrap;
             cursor:pointer;
             transition:all 0.2s;
+            opacity: ${dayOpacity};
             ${extraStyle}
           ">
             <span style="font-size:10px;">📍</span>${place.name}
           </div>
-        `;
+        `
       }
 
       const marker = new AMap.Marker({
         position: toLngLat(place.lngLat),
         content: markerContent,
         offset: new AMap.Pixel(0, 0),
-        anchor: "bottom-center",
+        anchor: 'bottom-center',
+        zIndex: isCurrentDay ? (isHighlighted ? 150 : 100) : 50,
         extData: {
           id: place.id,
           dayIndex: placeDayIndex,
         },
-      });
+      })
 
       marker.on("click", () => {
         const { isEditMode: currentEditMode, isRouting } =
@@ -414,70 +421,87 @@ export default function MapContainer() {
 
     // 绘制路线（使用路线所在天的主题色）
     routes.forEach((route) => {
-      const isHighlighted = highlightedId === route.id;
+      const isHighlighted = highlightedId === route.id
       const routeDayIndex =
-        days.find((d) => d.items.some((i) => i.id === route.id))?.dayIndex ?? 1;
-      const routeColor = getDayColor(routeDayIndex);
+        days.find((d) => d.items.some((i) => i.id === route.id))?.dayIndex ?? 1
+      const routeColor = getDayColor(routeDayIndex)
 
-      const strokeColor = routeColor.text;
-      const strokeOpacity = isHighlighted ? 1.0 : 0.55;
+      const strokeColor = routeColor.text
+      const isCurrentDay = routeDayIndex === activeDayIndex
+      const dayOpacity = isCurrentDay ? 1.0 : 0.4
+      let strokeOpacity = isHighlighted ? 1.0 : 0.55
+      if (!isCurrentDay) {
+        strokeOpacity = isHighlighted ? 0.4 : 0.15
+      }
+      const isFlight = route.category === '飞机' || route.name.includes('飞机') || route.name.toLowerCase().includes('flight')
 
       const polyline = new AMap.Polyline({
         path: route.path,
         strokeColor,
         strokeOpacity,
         strokeWeight: isHighlighted ? 6 : 4,
-        strokeStyle: "solid",
-        lineJoin: "round",
-        lineCap: "round",
-        cursor: "pointer",
+        strokeStyle: isFlight ? 'dashed' : 'solid',
+        strokeDasharray: isFlight ? [10, 10] : undefined,
+        lineJoin: 'round',
+        lineCap: 'round',
+        cursor: 'pointer',
         extData: { id: route.id },
-      });
+        zIndex: isCurrentDay ? (isHighlighted ? 80 : 70) : 30,
+      })
 
-      polyline.on("click", () => {
-        const { isEditMode: currentEditMode } = useTripStore.getState();
+      polyline.on('click', () => {
+        const { isEditMode: currentEditMode } = useTripStore.getState()
         if (!currentEditMode) {
-          setHighlightedId(route.id);
+          setHighlightedId(route.id)
         }
-      });
+      })
 
-      polyline.setMap(currentMap);
-      polylinesRef.current[route.id] = polyline;
+      polyline.setMap(currentMap)
+      polylinesRef.current[route.id] = polyline
 
       // 在路线中段添加带交通图标和距离的标签（由开关控制显示）
       if (route.path && route.path.length > 0 && showDetailedMarkers) {
-        const midIndex = Math.floor(route.path.length / 2);
-        const midPoint = route.path[midIndex];
+        const midIndex = Math.floor(route.path.length / 2)
+        const midPoint = route.path[midIndex]
 
-        let iconStr = "🚗";
-        if (route.name.includes("步行")) iconStr = "🚶";
-        else if (route.name.includes("骑行")) iconStr = "🚲";
+        let iconStr = '🚗'
+        const cat = route.category || ''
+        if (cat.includes('步行') || route.name.includes('步行')) {
+          iconStr = '🚶'
+        } else if (cat.includes('非机动车') || cat.includes('骑行') || route.name.includes('骑行')) {
+          iconStr = '🚲'
+        } else if (cat.includes('飞机') || route.name.includes('飞机')) {
+          iconStr = '✈️'
+        } else if (cat.includes('铁路') || cat.includes('火车') || route.name.includes('火车') || route.name.includes('铁路') || route.name.includes('高铁') || route.name.includes('动车')) {
+          iconStr = '🚇'
+        }
 
         const routeMarker = new AMap.Marker({
           position: midPoint,
           content: `
-            <div class="whitespace-nowrap px-2 py-1 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-100 flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${isHighlighted ? "ring-2 ring-indigo-500 text-indigo-700 shadow-md scale-105" : "text-gray-600 hover:scale-105"}">
+            <div class="whitespace-nowrap px-2 py-1 bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-100 flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${isHighlighted ? 'ring-2 ring-indigo-500 text-indigo-700 shadow-md scale-105' : 'text-gray-600 hover:scale-105'}"
+                 style="opacity: ${dayOpacity};">
               <span class="text-[10px]">${iconStr}</span>
-              <span>${route.distance}${route.duration ? " · " + route.duration : ""}</span>
+              <span>${route.distance}${route.duration ? ' · ' + route.duration : ''}</span>
             </div>
           `,
           offset: new AMap.Pixel(0, -10),
-          anchor: "center",
+          anchor: 'center',
           extData: { id: route.id },
-          zIndex: 100,
-        });
+          zIndex: isCurrentDay ? (isHighlighted ? 150 : 100) : 50,
+        })
 
-        routeMarker.on("click", () => {
-          const { isEditMode: currentEditMode } = useTripStore.getState();
+        routeMarker.on('click', () => {
+          const { isEditMode: currentEditMode } = useTripStore.getState()
           if (!currentEditMode) {
-            setHighlightedId(route.id);
+            setHighlightedId(route.id)
           }
-        });
+        })
 
-        routeMarker.setMap(currentMap);
-        markersRef.current[`${route.id}-label`] = routeMarker;
+        routeMarker.setMap(currentMap)
+        markersRef.current[`${route.id}-label`] = routeMarker
       }
-    });
+    })
 
     // 计算避让，防止 Marker 互相遮挡
     const adjustCollision = () => {
@@ -653,7 +677,7 @@ export default function MapContainer() {
 
     adjustCollisionRef.current = adjustCollision
     adjustCollision()
-  }, [days, highlightedId, setHighlightedId, setEditingItem, isMapReady, showDetailedMarkers, showAllPlaces, allPlacesCache])
+  }, [days, highlightedId, setHighlightedId, setEditingItem, isMapReady, showDetailedMarkers, showAllPlaces, allPlacesCache, activeDayIndex])
 
   // 移动端智能偏移聚焦计算，将 Marker 推送到屏幕上半部分可用区，防止被底部抽屉遮盖
   // 在真·双视图模式下，高亮卡片仅 108px，因此 Marker 直接在屏幕正中央聚焦展示是最美观和符合直觉的，无需进行偏移
