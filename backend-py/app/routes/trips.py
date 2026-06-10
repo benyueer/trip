@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.logger import logger
 from app.models import Day, Item, Trip, TripShare
 from app.routes.auth import require_auth
 from app.services.amap_route import calculate_route
@@ -398,14 +399,55 @@ async def calculate_and_add_route(
     if mode not in ("Driving", "Walking", "Riding"):
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="mode must be Driving, Walking, or Riding")
 
-    if not settings.amap_web_key:
-        raise HTTPException(status_code=500, detail="AMAP_WEB_KEY is not configured on server")
+    # 优先从数据库中匹配已有的路线数据
+    matched_route = None
+    try:
+        result_routes = await db_session.execute(
+            select(Item).where((Item.type == "route") & (Item.path.isnot(None)))
+        )
+        existing_routes = result_routes.scalars().all()
+        for r in existing_routes:
+            try:
+                r_path = json.loads(r.path) if isinstance(r.path, str) else r.path
+                if not isinstance(r_path, list) or len(r_path) < 2:
+                    continue
+                start_pt = r_path[0]
+                end_pt = r_path[-1]
 
-    route_result = await calculate_route(
-        (float(start_lng_lat[0]), float(start_lng_lat[1])),
-        (float(end_lng_lat[0]), float(end_lng_lat[1])),
-        mode,
-    )
+                # 比较起点与终点坐标是否极其接近（经纬度误差小于 0.0001 度，约 10 米以内）
+                if (abs(start_pt[0] - float(start_lng_lat[0])) < 0.0001 and
+                    abs(start_pt[1] - float(start_lng_lat[1])) < 0.0001 and
+                    abs(end_pt[0] - float(end_lng_lat[0])) < 0.0001 and
+                    abs(end_pt[1] - float(end_lng_lat[1])) < 0.0001):
+                    # 判断出行方式是否一致（由路线名是否包含中文出行方式校验得出）
+                    mode_zh = "驾车" if mode == "Driving" else "步行" if mode == "Walking" else "骑行"
+                    if mode_zh in (r.name or ""):
+                        matched_route = {
+                            "distance": r.distance,
+                            "duration": r.duration,
+                            "path": r_path,
+                        }
+                        break
+            except Exception:
+                continue
+    except Exception as e:
+        logger.error("route", f"Failed to check database route: {str(e)}")
+
+    if matched_route:
+        route_result = matched_route
+        logger.info("route", f"Database route matched: {name} (distance: {route_result['distance']})")
+    else:
+        if not settings.amap_web_key:
+            raise HTTPException(status_code=500, detail="AMAP_WEB_KEY is not configured on server")
+
+        route_result = await calculate_route(
+            (float(start_lng_lat[0]), float(start_lng_lat[1])),
+            (float(end_lng_lat[0]), float(end_lng_lat[1])),
+            mode,
+        )
+
+        if not route_result:
+            raise HTTPException(status_code=500, detail="Route calculation failed")
 
     if not route_result:
         raise HTTPException(status_code=500, detail="Route calculation failed")
