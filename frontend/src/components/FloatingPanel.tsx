@@ -277,6 +277,7 @@ export default function FloatingPanel({
     setIsEditMode,
     addDay,
     deleteDay,
+    addPlace,
     setHighlightedId,
     activeDayIndex,
     setActiveDayIndex,
@@ -304,6 +305,8 @@ export default function FloatingPanel({
   const [dayDescValue, setDayDescValue] = useState('')
   const dayDescInputRef = useRef<HTMLTextAreaElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isAddingPlace, setIsAddingPlace] = useState(false)
+  const [placeSearchQuery, setPlaceSearchQuery] = useState('')
 
   // 移动端自适应检测
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -388,11 +391,19 @@ export default function FloatingPanel({
   // Sorted: current trip's places first, then others
   const sortedAllPlaces: CachedPlace[] = allPlacesCache
     ? [...allPlacesCache].sort((a, b) => {
-        const aIn = currentTripPlaceIds.has(a.id) ? 0 : 1
-        const bIn = currentTripPlaceIds.has(b.id) ? 0 : 1
-        if (aIn !== bIn) return aIn - bIn
+        const aIn = currentTripPlaceIds.has(a.id)
+        const bIn = currentTripPlaceIds.has(b.id)
+        if (aIn && !bIn) return -1
+        if (!aIn && bIn) return 1
         return 0
       })
+    : []
+
+  const filteredCachedPlaces = allPlacesCache
+    ? allPlacesCache.filter(place =>
+        place.name.toLowerCase().includes(placeSearchQuery.toLowerCase()) ||
+        place.address?.toLowerCase().includes(placeSearchQuery.toLowerCase())
+      ).slice(0, 10)
     : []
 
   function handleDragStart(event: DragStartEvent) {
@@ -683,15 +694,127 @@ export default function FloatingPanel({
             </div>
           )}
 
-          {/* 添加路线按钮 */}
+          {/* 添加路线与添加地点按钮 */}
           {!isRouting && isEditMode && activeDay && (
-            <button
-              onClick={() => startRouting()}
-              className='w-full mb-4 py-2 border-2 border-dashed border-indigo-200 text-indigo-500 rounded-xl hover:bg-indigo-50 transition font-medium flex justify-center items-center gap-2'
-            >
-              <Navigation size={16} />
-              添加路线
-            </button>
+            <div className='flex gap-3 mb-4'>
+              <button
+                onClick={() => startRouting()}
+                className='flex-1 py-2 border-2 border-dashed border-indigo-200 text-indigo-500 rounded-xl hover:bg-indigo-50 transition font-medium flex justify-center items-center gap-2 cursor-pointer'
+              >
+                <Navigation size={16} className='transform rotate-45' />
+                添加路线
+              </button>
+              <button
+                onClick={() => {
+                  setIsAddingPlace(true)
+                  if (!allPlacesCache) {
+                    fetchAllPlaces()
+                  }
+                }}
+                className='flex-1 py-2 border-2 border-dashed border-blue-200 text-blue-500 rounded-xl hover:bg-blue-50 transition font-medium flex justify-center items-center gap-2 cursor-pointer'
+              >
+                <Plus size={16} />
+                添加地点
+              </button>
+            </div>
+          )}
+
+          {/* 添加地点下拉搜索区域 */}
+          {isAddingPlace && isEditMode && activeDay && (
+            <div className='mb-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200'>
+              <div className='flex justify-between items-center mb-2'>
+                <h3 className='font-bold text-blue-900 text-sm flex items-center gap-1.5'>
+                  <MapPin size={14} className='text-blue-500' />
+                  添加已有地点
+                </h3>
+                <button
+                  onClick={() => {
+                    setIsAddingPlace(false)
+                    setPlaceSearchQuery('')
+                  }}
+                  className='p-1 hover:bg-blue-100 rounded-lg text-blue-500 transition-colors cursor-pointer'
+                  title='取消'
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className='relative'>
+                <input
+                  autoFocus
+                  type='text'
+                  value={placeSearchQuery}
+                  onChange={e => setPlaceSearchQuery(e.target.value)}
+                  placeholder='输入地名或关键字搜索...'
+                  className='w-full px-3.5 py-2 bg-white border border-blue-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400 text-xs placeholder:text-gray-400 shadow-sm transition-all'
+                />
+              </div>
+
+              {allPlacesLoading ? (
+                <div className='py-4 text-center text-xs text-gray-400 animate-pulse'>
+                  加载地点数据中...
+                </div>
+              ) : (
+                <div className='mt-2 max-h-48 overflow-y-auto no-scrollbar flex flex-col gap-1.5'>
+                  {filteredCachedPlaces.length === 0 ? (
+                    <div className='py-4 text-center text-xs text-gray-400'>
+                      {placeSearchQuery ? '无匹配的地点' : '暂无可用地点'}
+                    </div>
+                  ) : (
+                    filteredCachedPlaces.map(place => (
+                      <div
+                        key={place.id}
+                        onClick={() => {
+                          const clonedPlace: Place = {
+                            id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+                            type: 'place',
+                            name: place.name,
+                            lngLat: place.lngLat,
+                            description: place.description,
+                            ticket: place.ticket,
+                            address: place.address,
+                            phone: place.phone,
+                            openingHours: place.openingHours,
+                            rating: place.rating,
+                            category: place.category,
+                            notes: place.notes
+                          }
+                          addPlace(activeDayIndex, clonedPlace)
+                          setIsAddingPlace(false)
+                          setPlaceSearchQuery('')
+                        }}
+                        className='p-2 bg-white hover:bg-blue-50 border border-gray-100 rounded-lg cursor-pointer transition-all flex justify-between items-center gap-2 group'
+                      >
+                        <div className='min-w-0 flex-1'>
+                          <div className='flex items-center gap-1.5'>
+                            <span className='text-xs font-bold text-gray-800 truncate group-hover:text-blue-900'>
+                              {place.name}
+                            </span>
+                            {place.category && (
+                              <span className='text-[8px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-medium shrink-0'>
+                                {place.category}
+                              </span>
+                            )}
+                          </div>
+                          <div className='flex items-center gap-1 mt-0.5 text-[9px] text-gray-400'>
+                            <span className='truncate max-w-[120px]'>来自: {place.tripTitle}</span>
+                            {place.address && (
+                              <>
+                                <span>•</span>
+                                <span className='truncate'>{place.address}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <button className='px-2 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-bold group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0 cursor-pointer'>
+                          选择
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {!activeDay ? (
