@@ -106,22 +106,24 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         if not query or not query.strip():
             return {"places": [], "count": 0, "suggested_places": []}
 
-        result = await db_session.execute(
+        from sqlalchemy import or_
+
+        stmt = (
             select(Item)
-            .where(Item.type == "place")
-            .options(selectinload(Item.day).selectinload(Day.trip))
+            .where(
+                (Item.type == "place") &
+                or_(
+                    Item.name.ilike(f"%{query}%"),
+                    Item.description.ilike(f"%{query}%"),
+                    Item.category.ilike(f"%{query}%"),
+                    Item.address.ilike(f"%{query}%")
+                )
+            )
+            .limit(limit)
         )
-        all_places = result.scalars().all()
+        result = await db_session.execute(stmt)
+        places = result.scalars().all()
 
-        filtered = []
-        for p in all_places:
-            if (query.lower() in p.name.lower()
-                    or (p.description and query.lower() in p.description.lower())
-                    or (p.category and query.lower() in p.category.lower())
-                    or (p.address and query.lower() in p.address.lower())):
-                filtered.append(p)
-
-        places = filtered[:limit]
         result_list: list[dict] = []
         for p in places:
             lnglat = p.lngLat
@@ -373,6 +375,125 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         logger.agent.tool_call("returnPlaces", {"count": len(places)})
         return {"suggested_places": places, "count": len(places)}
 
+    @tool("importDayRoute")
+    async def import_day_route_(
+        trip_id: str,
+        day_index: int,
+        places: list[dict],
+        description: str = "",
+    ) -> dict:
+        """Import a route for a specific day in the trip. It calculates routes between the places and saves the day's itinerary (places and routes) to the database, replacing any existing items for that day.
+        Each place in places list must have: name (string), lngLat ([number, number]), and optionally: description, category, address, rating, ticket, openingHours, phone, notes.
+        """
+        logger.agent.tool_call("importDayRoute", {
+            "tripId": trip_id,
+            "dayIndex": day_index,
+            "placesCount": len(places),
+        })
+
+        if not trip_id:
+            return {"error": "trip_id is required"}
+        if not places:
+            return {"error": "At least one place is required"}
+
+        from sqlalchemy import delete as sa_delete
+
+        # 1. 验证行程，获取或创建对应天的 Day 记录
+        result = await db_session.execute(
+            select(Trip)
+            .where(Trip.id == trip_id)
+            .options(selectinload(Trip.days).selectinload(Day.items))
+        )
+        trip = result.scalar_one_or_none()
+        if not trip:
+            return {"error": "Trip not found"}
+
+        day = next((d for d in trip.days if d.dayIndex == day_index), None)
+        if day:
+            # 清除相关的旧 items
+            await db_session.execute(sa_delete(Item).where(Item.dayId == day.id))
+            if description:
+                day.description = description
+            await db_session.flush()
+        else:
+            day = Day(dayIndex=day_index, tripId=trip_id, description=description or f"第{day_index}天行程")
+            db_session.add(day)
+            await db_session.flush()
+
+        # 2. 规范化 places
+        mapped_places = [
+            {
+                "name": p["name"],
+                "lngLat": _normalize_lnglat(p.get("lngLat", [])),
+                "description": p.get("description", ""),
+                "category": p.get("category", ""),
+                "address": p.get("address", ""),
+                "rating": p.get("rating", ""),
+                "ticket": p.get("ticket", ""),
+                "openingHours": p.get("openingHours", ""),
+                "phone": p.get("phone", ""),
+                "notes": p.get("notes", ""),
+                "order": p.get("order", i + 1),
+            }
+            for i, p in enumerate(places)
+        ]
+
+        # 3. 计算相邻地点之间的路线
+        routes = await calculate_routes_between_places(mapped_places)
+
+        # 4. 按照交织顺序添加 items 到数据库
+        for i, mp in enumerate(mapped_places):
+            item_place = Item(
+                id=str(uuid.uuid4()),
+                type="place",
+                name=mp["name"],
+                lngLat=json.dumps(mp["lngLat"]),
+                description=mp.get("description", ""),
+                category=mp.get("category", ""),
+                address=mp.get("address", ""),
+                rating=mp.get("rating", ""),
+                ticket=mp.get("ticket", ""),
+                openingHours=mp.get("openingHours", ""),
+                phone=mp.get("phone", ""),
+                notes=mp.get("notes", ""),
+                dayId=day.id
+            )
+            db_session.add(item_place)
+            await db_session.flush()
+
+            if i < len(routes):
+                r_data = routes[i]
+                item_route = Item(
+                    id=str(uuid.uuid4()),
+                    type="route",
+                    name="驾车",
+                    distance=r_data.get("distance", "未知"),
+                    duration=r_data.get("duration", "未知"),
+                    path=json.dumps(r_data.get("path", [])),
+                    dayId=day.id
+                )
+                db_session.add(item_route)
+                await db_session.flush()
+
+        await db_session.flush()
+
+        plan = {
+            "dayIndex": day_index,
+            "title": day.description,
+            "description": day.description,
+            "places": mapped_places,
+            "routes": routes,
+        }
+
+        logger.info("tools", f'importDayRoute(day{day_index}) direct-saved → {len(mapped_places)} places, {len(routes)} routes')
+        return {
+            "status": "imported",
+            "tripId": trip_id,
+            "dayIndex": day_index,
+            "plan": plan,
+            "message": f"已为您导入并规划第{day_index}天的行程：{' → '.join(p['name'] for p in mapped_places)}"
+        }
+
     tools_list = [
         web_search,
         query_local_places,
@@ -381,15 +502,17 @@ def create_local_tools(db_session: AsyncSession, user_id: str) -> list[BaseTool]
         modify_trip_plan_,
         plan_day_route_,
         return_places_,
+        import_day_route_,
     ]
 
     # Tag tools with the intents they serve
     web_search._intent_tags = ["place_search", "trip_planner"]
-    query_local_places._intent_tags = ["place_search", "trip_planner"]
+    query_local_places._intent_tags = ["place_search", "trip_planner", "import_itinerary"]
     save_user_memory_._intent_tags = ["memory"]
     create_trip_plan_._intent_tags = ["trip_planner"]
     modify_trip_plan_._intent_tags = ["trip_planner"]
     plan_day_route_._intent_tags = ["trip_planner"]
     return_places_._intent_tags = ["place_search"]
+    import_day_route_._intent_tags = ["import_itinerary"]
 
     return tools_list

@@ -5,6 +5,7 @@ import json
 from typing import Any, AsyncIterator
 
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.tool_node import ToolNode
 
@@ -20,6 +21,24 @@ from app.agent.prompt_builder import PromptBuilder
 from app.agent.tool_registry import ToolRegistry
 from app.config import settings
 from app.logger import logger
+
+_DEFAULT_TITLE = "新对话"
+
+
+async def _generate_title(user_message: str) -> str:
+    """Generate a short session title from the user's first message."""
+    llm = ChatOpenAI(
+        model=settings.agent_compress_model or settings.llm_model,
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        temperature=0.3,
+    )
+    resp = await llm.ainvoke([
+        SystemMessage(content="你是一个对话标题生成器。根据用户的消息，生成一个简短的对话标题（不超过20个字）。只输出标题本身，不要加引号或其他内容。"),
+        HumanMessage(content=user_message),
+    ])
+    title = resp.content.strip().strip('"').strip("'")
+    return title[:50] if title else _DEFAULT_TITLE
 
 
 async def handle_agent(
@@ -39,6 +58,16 @@ async def handle_agent(
     """
     # Save user message
     await message_manager.save_message(session_id, "user", user_message)
+
+    # Auto-generate title from first message if still default
+    session = await message_manager.get_or_create_session(session_id, user_id)
+    if session.title == _DEFAULT_TITLE:
+        try:
+            new_title = await _generate_title(user_message)
+            await message_manager.update_session_title(session, new_title)
+            yield json.dumps({"type": "title", "title": new_title}, ensure_ascii=False) + "\n"
+        except Exception as e:
+            logger.error("agent", f"Title generation failed: {e}")
 
     # Load history (auto-compressed if too long) and build prompt
     history = await message_manager.load_compressed_history(session_id)

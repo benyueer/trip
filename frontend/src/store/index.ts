@@ -1,7 +1,11 @@
 import { create } from 'zustand'
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:3001/api'
+const genId = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api`
+  : '/api'
 
 export type ItemType = 'place' | 'route'
 
@@ -90,6 +94,7 @@ export interface AgentMessage {
   role: 'user' | 'assistant'
   content: string
   metadata?: {
+    error?: boolean
     suggestedPlaces?: Array<{
       name: string
       lngLat: [number, number]
@@ -162,6 +167,7 @@ export interface TripState {
   user: User | null
   isAuthenticated: boolean
   authChecked: boolean
+  isGuest: boolean
 
   // Actions
   fetchTrips: () => Promise<void>
@@ -182,8 +188,9 @@ export interface TripState {
   deleteItem: (dayIndex: number, itemId: string) => void
   addRoute: (dayIndex: number, route: Route) => void
   calculateAndAddRoute: (dayIndex: number, startPlace: Place, endPlace: Place, mode: string) => Promise<void>
-  reorderItems: (dayIndex: number, newItems: TripItem[]) => void
-  moveItem: (fromDayIndex: number, toDayIndex: number, itemId: string) => void
+  reorderItems: (dayIndex: number, newItems: TripItem[]) => Promise<void>
+  moveItem: (fromDayIndex: number, toDayIndex: number, itemId: string) => Promise<void>
+  autoRecalculateRoutes: (dayIndex: number) => Promise<void>
 
   // All-places actions
   fetchAllPlaces: () => Promise<void>
@@ -213,13 +220,15 @@ export interface TripState {
     duration: string
     path: [number, number][]
   }> | null
+  agentIntent: string | null
 
   // Agent actions
   fetchAgentSessions: () => Promise<void>
   createAgentSession: (title?: string) => Promise<string>
+  updateAgentSession: (id: string, title: string) => Promise<void>
   deleteAgentSession: (id: string) => Promise<void>
   setActiveAgentSession: (id: string) => Promise<void>
-  sendAgentMessage: (content: string, currentTripId?: string) => Promise<void>
+  sendAgentMessage: (content: string, currentTripId?: string, intent?: string) => Promise<void>
   setAgentPanelOpen: (open: boolean) => void
   clearSuggestedPlaces: () => void
   addSuggestedPlaceToTrip: (place: { name: string; lngLat: [number, number]; description?: string; category?: string; address?: string; rating?: string; ticket?: string; openingHours?: string; phone?: string; notes?: string }, dayIndex?: number) => void
@@ -242,6 +251,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   authChecked: false,
+  isGuest: false,
 
   fetchTrips: async () => {
     set({ loading: true })
@@ -299,11 +309,11 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   setHighlightedId: (id) => set({ highlightedId: id }),
-  
+
   setActiveDayIndex: (activeDayIndex) => set({ activeDayIndex }),
-  
+
   setIsEditMode: (isEditMode) => set({ isEditMode, highlightedId: null, editingItem: null }),
-  
+
   setEditingItem: (editingItem) => set({ editingItem }),
 
   addPlace: (dayIndex, place) => {
@@ -317,7 +327,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       newDays.push(day)
     }
     day.items.push(place)
-    
+
     get().updateCurrentTrip({ days: newDays })
   },
 
@@ -354,7 +364,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       }
       return day
     })
-    
+
     get().updateCurrentTrip({ days: newDays })
   },
 
@@ -366,15 +376,15 @@ export const useTripStore = create<TripState>((set, get) => ({
     try {
       const modeName = mode === 'Driving' ? '驾车' : mode === 'Walking' ? '步行' : '骑行'
       const name = `${startPlace.name} 到 ${endPlace.name} (${modeName})`
-      
+
       const response = await axios.post(`${API_BASE_URL}/trips/${currentTrip.id}/days/${dayIndex}/routes`, {
-        routeId: crypto.randomUUID(),
+        routeId: genId(),
         startLngLat: startPlace.lngLat,
         endLngLat: endPlace.lngLat,
         mode,
         name
       }, { withCredentials: true })
-      
+
       set({ currentTrip: response.data, loading: false })
       get().cancelRouting()
     } catch (error) {
@@ -396,12 +406,12 @@ export const useTripStore = create<TripState>((set, get) => ({
       newDays.push(day)
     }
     day.items.push(route)
-    
+
     get().updateCurrentTrip({ days: newDays })
   },
 
   // 在同一天内重新排序
-  reorderItems: (dayIndex, newItems) => {
+  reorderItems: async (dayIndex, newItems) => {
     const { currentTrip } = get()
     if (!currentTrip) return
 
@@ -412,11 +422,12 @@ export const useTripStore = create<TripState>((set, get) => ({
       return day
     })
 
-    get().updateCurrentTrip({ days: newDays })
+    await get().updateCurrentTrip({ days: newDays })
+    await get().autoRecalculateRoutes(dayIndex)
   },
 
   // 将某个条目从一天移动到另一天
-  moveItem: (fromDayIndex, toDayIndex, itemId) => {
+  moveItem: async (fromDayIndex, toDayIndex, itemId) => {
     const { currentTrip } = get()
     if (!currentTrip) return
 
@@ -437,7 +448,80 @@ export const useTripStore = create<TripState>((set, get) => ({
       targetDay.items.push(itemToMove)
     }
 
-    get().updateCurrentTrip({ days: newDays })
+    await get().updateCurrentTrip({ days: newDays })
+    await get().autoRecalculateRoutes(fromDayIndex)
+    await get().autoRecalculateRoutes(toDayIndex)
+  },
+
+  // 自动重新计算某一天的路线
+  autoRecalculateRoutes: async (dayIndex: number) => {
+    const { currentTrip, updateCurrentTrip } = get()
+    if (!currentTrip) return
+
+    const day = currentTrip.days.find(d => d.dayIndex === dayIndex)
+    if (!day) return
+
+    // 1. 过滤出所有的地点，丢弃路线
+    const places = day.items.filter(item => item.type === 'place') as Place[]
+
+    // 2. 本地即时清理路线并保存
+    const updatedDays = currentTrip.days.map(d => {
+      if (d.dayIndex === dayIndex) {
+        return { ...d, items: [...places] }
+      }
+      return d
+    })
+
+    const updatedTrip = { ...currentTrip, days: updatedDays }
+    set({ currentTrip: updatedTrip })
+
+    // 如果地点少于2个，无需重新规划路线，直接写回后端即可
+    if (places.length < 2) {
+      await updateCurrentTrip({ days: updatedDays })
+      return
+    }
+
+    // 3. 顺次向后端请求路线，并交织插入 items 数组
+    const finalItems: TripItem[] = [places[0]]
+
+    for (let i = 0; i < places.length - 1; i++) {
+      const start = places[i]
+      const end = places[i + 1]
+      try {
+        const mode = 'Driving'
+        const modeName = '驾车'
+        const name = `${start.name} 到 ${end.name} (${modeName})`
+
+        const response = await axios.post(`${API_BASE_URL}/trips/${currentTrip.id}/days/${dayIndex}/routes`, {
+          routeId: genId(),
+          startLngLat: start.lngLat,
+          endLngLat: end.lngLat,
+          mode,
+          name
+        }, { withCredentials: true })
+
+        const newTrip = response.data
+        const dayFromNewTrip = newTrip.days.find((d: any) => d.dayIndex === dayIndex)
+        // 找到最新追加的 route 节点
+        const addedRoute = dayFromNewTrip?.items.find((item: any) => item.type === 'route' && !finalItems.some(f => f.id === item.id))
+
+        if (addedRoute) {
+          finalItems.push(addedRoute)
+        }
+      } catch (err) {
+        console.error('Auto routing failed:', err)
+      }
+      finalItems.push(places[i + 1])
+    }
+
+    // 4. 将完整排好序、路线交叉好的数组再次更新提交给后端
+    const finalDays = currentTrip.days.map(d => {
+      if (d.dayIndex === dayIndex) {
+        return { ...d, items: finalItems }
+      }
+      return d
+    })
+    await updateCurrentTrip({ days: finalDays })
   },
 
   addDay: async () => {
@@ -445,10 +529,10 @@ export const useTripStore = create<TripState>((set, get) => ({
     if (!currentTrip) return
 
     const newDays = [...currentTrip.days]
-    const nextIndex = newDays.length > 0 
-      ? Math.max(...newDays.map(d => d.dayIndex)) + 1 
+    const nextIndex = newDays.length > 0
+      ? Math.max(...newDays.map(d => d.dayIndex)) + 1
       : 1
-    
+
     newDays.push({
       dayIndex: nextIndex,
       items: []
@@ -498,17 +582,17 @@ export const useTripStore = create<TripState>((set, get) => ({
   routingStartItem: null,
   routingEndItem: null,
 
-  startRouting: () => set({ 
-    isRouting: true, 
-    routingStartItem: null, 
+  startRouting: () => set({
+    isRouting: true,
+    routingStartItem: null,
     routingEndItem: null,
-    highlightedId: null 
+    highlightedId: null
   }),
 
-  cancelRouting: () => set({ 
-    isRouting: false, 
-    routingStartItem: null, 
-    routingEndItem: null 
+  cancelRouting: () => set({
+    isRouting: false,
+    routingStartItem: null,
+    routingEndItem: null
   }),
 
   setRoutingStart: (item) => set({ routingStartItem: item }),
@@ -520,9 +604,25 @@ export const useTripStore = create<TripState>((set, get) => ({
       const response = await axios.get(`${API_BASE_URL.replace('/api', '')}/auth/me`, {
         withCredentials: true,
       })
-      set({ user: response.data, isAuthenticated: true, authChecked: true })
+      const user = response.data
+      set({ user, isAuthenticated: true, authChecked: true, isGuest: user?.provider === 'guest' })
     } catch {
-      set({ user: null, isAuthenticated: false, authChecked: true })
+      let loggedInAsGuest = false
+      if (localStorage.getItem('is_guest') === 'true') {
+        try {
+          const response = await axios.get(`${API_BASE_URL.replace('/api', '')}/auth/guest-login`, {
+            withCredentials: true,
+          })
+          const user = response.data
+          set({ user, isAuthenticated: true, authChecked: true, isGuest: true })
+          loggedInAsGuest = true
+        } catch {
+          localStorage.removeItem('is_guest')
+        }
+      }
+      if (!loggedInAsGuest) {
+        set({ user: null, isAuthenticated: false, authChecked: true, isGuest: false })
+      }
     }
   },
 
@@ -534,7 +634,8 @@ export const useTripStore = create<TripState>((set, get) => ({
     } catch {
       // Ignore errors on logout
     }
-    set({ user: null, isAuthenticated: false, currentTrip: null, trips: [] })
+    localStorage.removeItem('is_guest')
+    set({ user: null, isAuthenticated: false, isGuest: false, currentTrip: null, trips: [] })
   },
 
   // Agent state — restore last active session from localStorage
@@ -568,6 +669,17 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
+  updateAgentSession: async (id, title) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/agent/sessions/${id}`, { title }, { withCredentials: true })
+      set(state => ({
+        agentSessions: state.agentSessions.map(s => s.id === id ? { ...s, title: response.data.title } : s),
+      }))
+    } catch (error) {
+      console.error('Failed to update agent session:', error)
+    }
+  },
+
   deleteAgentSession: async (id) => {
     try {
       await axios.delete(`${API_BASE_URL}/agent/sessions/${id}`, { withCredentials: true })
@@ -595,7 +707,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
   },
 
-  sendAgentMessage: async (content, currentTripId) => {
+  sendAgentMessage: async (content, currentTripId, intent) => {
     const { activeAgentSessionId } = get()
     if (!activeAgentSessionId) return
 
@@ -627,7 +739,7 @@ export const useTripStore = create<TripState>((set, get) => ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ content, currentTripId }),
+        body: JSON.stringify({ content, currentTripId, intent }),
       })
 
       if (!response.ok) {
@@ -676,6 +788,12 @@ export const useTripStore = create<TripState>((set, get) => ({
 
           if (event.type === 'token') {
             textContent += event.content
+          } else if (event.type === 'title') {
+            set(state => ({
+              agentSessions: state.agentSessions.map(s =>
+                s.id === activeAgentSessionId ? { ...s, title: event.title } : s
+              ),
+            }))
           } else if (event.type === 'tool_start') {
             toolSteps.push({
               tool: event.tool,
@@ -739,7 +857,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       set(state => ({
         agentMessages: state.agentMessages.map(m =>
           m.id === assistantId
-            ? { ...m, content: '抱歉，处理消息时出现错误，请重试。' }
+            ? { ...m, content: '抱歉，处理消息时出现错误，请重试。', metadata: { ...m.metadata, error: true } }
             : m
         ),
         agentLoading: false,
@@ -767,7 +885,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
 
     day.items.push({
-      id: crypto.randomUUID(),
+      id: genId(),
       type: 'place',
       name: place.name,
       lngLat: place.lngLat,

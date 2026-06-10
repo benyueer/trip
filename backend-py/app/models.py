@@ -25,6 +25,7 @@ class User(SQLModel, table=True):
     providerId: str = Field(nullable=False, unique=True, max_length=255)
     createdAt: datetime = Field(default_factory=_utcnow, nullable=False)
     updatedAt: datetime = Field(default_factory=_utcnow, nullable=False)
+    password_hash: Optional[str] = Field(default=None, max_length=255)
 
     owned_trips: list["Trip"] = Relationship(back_populates="owner")
     shared_trips: list["TripShare"] = Relationship(back_populates="user")

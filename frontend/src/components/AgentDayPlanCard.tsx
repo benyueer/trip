@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import { MapPin, Check, X, Clock, Navigation } from 'lucide-react'
 import { useTripStore } from '../store'
 
+const genId = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+
 interface Place {
   name: string
   lngLat: [number, number]
@@ -58,7 +60,7 @@ export function AgentDayPlanCard({ plan, onAccept, onReject }: Props) {
 
     for (const place of plan.places) {
       day.items.push({
-        id: crypto.randomUUID(),
+        id: genId(),
         type: 'place',
         name: place.name,
         lngLat: place.lngLat,
@@ -72,6 +74,24 @@ export function AgentDayPlanCard({ plan, onAccept, onReject }: Props) {
         notes: place.notes || '',
       })
     }
+
+    // Add routes between places
+    if (plan.routes) {
+      for (let i = 0; i < plan.routes.length; i++) {
+        const route = plan.routes[i]
+        const fromName = plan.places[i]?.name || ''
+        const toName = plan.places[i + 1]?.name || ''
+        day.items.push({
+          id: genId(),
+          type: 'route',
+          name: `${fromName} → ${toName}`,
+          distance: route.distance || '',
+          duration: route.duration || '',
+          path: route.path || [],
+        })
+      }
+    }
+
     updateCurrentTrip({ days: newDays })
     useTripStore.getState().setAgentPlanRoutes(null)
     useTripStore.setState({ agentSuggestedPlaces: null })

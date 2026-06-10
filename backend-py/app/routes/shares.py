@@ -48,6 +48,8 @@ async def create_share(
     request: Request,
     db_session: AsyncSession,
 ) -> dict:
+    if request.user.get("provider") == "guest":
+        raise HTTPException(status_code=403, detail="游客模式只读，无法进行此操作")
     user_id = request.user["id"]
 
     result = await db_session.execute(select(Trip).where(Trip.id == trip_id))
@@ -90,6 +92,8 @@ async def delete_share(
     request: Request,
     db_session: AsyncSession,
 ) -> None:
+    if request.user.get("provider") == "guest":
+        raise HTTPException(status_code=403, detail="游客模式只读，无法进行此操作")
     user_id = request.user["id"]
 
     result = await db_session.execute(select(Trip).where(Trip.id == trip_id))

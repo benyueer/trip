@@ -122,6 +122,7 @@ EXTRACTORS = {
     "place_search": extract_places_metadata,
     "trip_planner": extract_trip_metadata,
     "memory": extract_memory_metadata,
+    "import_itinerary": extract_trip_metadata,
 }
 
 
@@ -130,6 +131,7 @@ RECURSION_LIMITS = {
     "place_search": 30,
     "trip_planner": 50,
     "memory": 10,
+    "import_itinerary": 50,
 }
 
 DEFAULT_RECURSION_LIMIT = 30

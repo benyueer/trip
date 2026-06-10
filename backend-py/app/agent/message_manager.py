@@ -79,6 +79,10 @@ class MessageManager:
                 await self.save_summary(session_id, msg.content, old_count)
         return history
 
+    async def update_session_title(self, session: AgentSession, title: str) -> None:
+        session.title = title
+        await self.db.flush()
+
     async def touch_session(self, session: AgentSession) -> None:
         session.updatedAt = _utcnow()
         await self.db.flush()

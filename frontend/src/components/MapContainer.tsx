@@ -37,8 +37,10 @@ export default function MapContainer() {
   const polylinesRef = useRef<{ [id: string]: any }>({});
   const AMapInstance = useRef<any>(null);
   const hasSetInitialCenter = useRef(false);
-  const [isMapReady, setIsMapReady] = useState(false);
-  const [zoom, setZoom] = useState(11);
+  const adjustCollisionRef = useRef<() => void>(() => {})
+  const [isMapReady, setIsMapReady] = useState(false)
+  const [showDetailedMarkers, setShowDetailedMarkers] = useState(true)
+  const [mapLayer, setMapLayer] = useState<'standard' | 'amap' | 'tianditu'>('standard')
 
   const currentTrip = useTripStore((state) => state.currentTrip);
   const days = currentTrip?.days || [];
@@ -98,8 +100,10 @@ export default function MapContainer() {
             isEditMode: currentEditMode,
             isRouting,
             activeDayIndex: currentDay,
+            isGuest,
           } = useTripStore.getState();
           
+          if (isGuest) return;
           if (currentEditMode && !isRouting) {
             const lngLat: [number, number] = [e.lnglat.getLng(), e.lnglat.getLat()];
             
@@ -162,10 +166,13 @@ export default function MapContainer() {
           }
         });
 
-        // 监听缩放变化
-        map.current.on("zoomend", () => {
-          setZoom(map.current.getZoom());
-        });
+        // 监听缩放和拖拽移动，重新计算避让
+        map.current.on('zoomend', () => {
+          adjustCollisionRef.current()
+        })
+        map.current.on('moveend', () => {
+          adjustCollisionRef.current()
+        })
       })
       .catch((e) => {
         console.log(e);
@@ -177,6 +184,61 @@ export default function MapContainer() {
       }
     };
   }, [setEditingItem]);
+
+  // 卫星图图层切换
+  useEffect(() => {
+    if (!isMapReady || !map.current || !AMapInstance.current) return;
+    const AMap = AMapInstance.current;
+    const currentMap = map.current;
+
+    if (mapLayer === 'amap') {
+      const satellite = new AMap.TileLayer.Satellite();
+      const roadNet = new AMap.TileLayer.RoadNet();
+      currentMap.add([satellite, roadNet]);
+      return () => { currentMap.remove([satellite, roadNet]); };
+    }
+
+    if (mapLayer === 'tianditu') {
+      const tk = import.meta.env.VITE_TIANDITU_KEY;
+      const makeUrl = (layer: string) => (x: number, y: number, z: number) => {
+        const s = Math.abs(x + y) % 8;
+        return `https://t${s}.tianditu.gov.cn/${layer}/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${layer === 'img_w' ? 'img' : 'cia'}&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&tk=${tk}`;
+      };
+
+      const satellite = new AMap.TileLayer({ getTileUrl: makeUrl('img_w') });
+      const annotation = new AMap.TileLayer({ getTileUrl: makeUrl('cia_w') });
+      currentMap.add([satellite, annotation]);
+
+      const satEl = (satellite as any)._container as HTMLElement | undefined;
+      const annEl = (annotation as any)._container as HTMLElement | undefined;
+
+      const applyOffset = () => {
+        const center = currentMap.getCenter();
+        if (!center) return;
+        const wgs = AMap.convertFrom(center, 'gps');
+        if (!wgs || !wgs[0]) return;
+        const dLng = center.getLng() - wgs[0].getLng();
+        const dLat = center.getLat() - wgs[0].getLat();
+        const res = 360 / (256 * Math.pow(2, currentMap.getZoom()));
+        const px = dLng / res;
+        const py = -dLat / res;
+        const transform = `translate(${px}px, ${py}px)`;
+        if (satEl) satEl.style.transform = transform;
+        if (annEl) annEl.style.transform = transform;
+      };
+
+      applyOffset();
+      const onAdjust = () => applyOffset();
+      currentMap.on('zoomend', onAdjust);
+      currentMap.on('moveend', onAdjust);
+
+      return () => {
+        currentMap.off('zoomend', onAdjust);
+        currentMap.off('moveend', onAdjust);
+        currentMap.remove([satellite, annotation]);
+      };
+    }
+  }, [mapLayer, isMapReady]);
 
   // 监听数据与高亮状态变化，更新 Markers 与路线
   useEffect(() => {
@@ -216,9 +278,9 @@ export default function MapContainer() {
         days.find((d) => d.items.some((i) => i.id === place.id))?.dayIndex ?? 1;
       const color = getDayColor(placeDayIndex);
 
-      // 缩放级别较小时（zoom < 10），非高亮的图标显示为小点
-      const isSmallMode = zoom < 10;
-      let markerContent = "";
+      // 由开关控制，非高亮的图标显示为小点
+      const isSmallMode = !showDetailedMarkers
+      let markerContent = ''
 
       if (isSmallMode && !isHighlighted && !isRouting) {
         markerContent = `
@@ -382,8 +444,8 @@ export default function MapContainer() {
       polyline.setMap(currentMap);
       polylinesRef.current[route.id] = polyline;
 
-      // 在路线中段添加带交通图标和距离的标签（缩放级别较小时隐藏）
-      if (route.path && route.path.length > 0 && zoom >= 8) {
+      // 在路线中段添加带交通图标和距离的标签（由开关控制显示）
+      if (route.path && route.path.length > 0 && showDetailedMarkers) {
         const midIndex = Math.floor(route.path.length / 2);
         const midPoint = route.path[midIndex];
 
@@ -417,43 +479,225 @@ export default function MapContainer() {
       }
     });
 
-  }, [days, highlightedId, setHighlightedId, setEditingItem, isMapReady, zoom, showAllPlaces, allPlacesCache]);
+    // 计算避让，防止 Marker 互相遮挡
+    const adjustCollision = () => {
+      if (!currentMap || !AMapInstance.current) return
+
+      const elementsToProcess: Array<{
+        id: string
+        name: string
+        lngLat: [number, number]
+        isImportant: boolean
+        type: 'place' | 'route-label'
+      }> = []
+
+      const { routingStartItem, routingEndItem, isRouting } = useTripStore.getState()
+
+      // 1. 收集行程地点
+      places.forEach((p) => {
+        const isHighlighted = highlightedId === p.id
+        const isRouteBoundary = isRouting && (routingStartItem?.id === p.id || routingEndItem?.id === p.id)
+        elementsToProcess.push({
+          id: p.id,
+          name: p.name,
+          lngLat: p.lngLat,
+          isImportant: isHighlighted || isRouteBoundary,
+          type: 'place',
+        })
+      })
+
+      // 2. 收集背景缓存地点
+      if (showAllPlaces && allPlacesCache) {
+        const currentPlaceIds = new Set(places.map((p) => p.id))
+        allPlacesCache.forEach((cached) => {
+          if (currentPlaceIds.has(cached.id)) return
+          const isHighlighted = highlightedId === cached.id
+          elementsToProcess.push({
+            id: cached.id,
+            name: cached.name,
+            lngLat: cached.lngLat,
+            isImportant: isHighlighted,
+            type: 'place',
+          })
+        })
+      }
+
+      // 3. 收集路线标签
+      routes.forEach((r) => {
+        const labelMarker = markersRef.current[`${r.id}-label`]
+        if (!labelMarker) return
+
+        const isHighlighted = highlightedId === r.id
+        if (r.path && r.path.length > 0) {
+          const midIndex = Math.floor(r.path.length / 2)
+          elementsToProcess.push({
+            id: `${r.id}-label`,
+            name: r.name,
+            lngLat: r.path[midIndex],
+            isImportant: isHighlighted,
+            type: 'route-label',
+          })
+        }
+      })
+
+      // 4. 按优先级排序（重要程度高的排在前面，优先展示，不被碰撞遮挡）
+      elementsToProcess.sort((a, b) => {
+        if (a.isImportant && !b.isImportant) return -1
+        if (!a.isImportant && b.isImportant) return 1
+        return 0
+      })
+
+      // 5. 逐一碰撞检测
+      const displayedBoxes: Array<{
+        left: number
+        top: number
+        right: number
+        bottom: number
+      }> = []
+
+      elementsToProcess.forEach((elem) => {
+        const marker = markersRef.current[elem.id]
+        if (!marker) return
+
+        const rawLngLat = toLngLat(elem.lngLat)
+        const amapLngLat = new AMap.LngLat(rawLngLat[0], rawLngLat[1])
+        const pixel = currentMap.lngLatToContainer(amapLngLat)
+        if (!pixel || typeof pixel.x !== 'number' || typeof pixel.y !== 'number') return
+
+        const x = pixel.x
+        const y = pixel.y
+
+        // 根据类型和状态估计包围盒大小
+        let width = 10
+        let height = 10
+        const padding = 3 // 碰撞安全间距缓冲
+
+        if (elem.type === 'place') {
+          const isHighlighted = highlightedId === elem.id
+          const isSmallMode = !showDetailedMarkers
+
+          if (isSmallMode && !isHighlighted && !(isRouting && (routingStartItem?.id === elem.id || routingEndItem?.id === elem.id))) {
+            // 精简非高亮圆点，10x10
+            width = 10
+            height = 10
+          } else {
+            // 详细标签，根据字符估算宽度，高度约 28px，anchor 为 bottom-center
+            const nameLength = elem.name.length
+            width = nameLength * 12 + 36
+            height = 28
+          }
+
+          // 锚点为 bottom-center
+          const box = {
+            left: x - width / 2 - padding,
+            top: y - height - padding,
+            right: x + width / 2 + padding,
+            bottom: y + padding,
+          }
+
+          let hasCollision = false
+          if (!elem.isImportant) {
+            for (const displayed of displayedBoxes) {
+              if (!(box.left > displayed.right ||
+                    box.right < displayed.left ||
+                    box.top > displayed.bottom ||
+                    box.bottom < displayed.top)) {
+                hasCollision = true
+                break
+              }
+            }
+          }
+
+          if (hasCollision) {
+            marker.hide()
+          } else {
+            marker.show()
+            displayedBoxes.push(box)
+          }
+
+        } else if (elem.type === 'route-label') {
+          // 路线中段标签，宽约 90px，高约 24px，offset (0, -10)，anchor 为 center
+          width = 90
+          height = 24
+
+          // 锚点为 center，且偏移 y 向下 -10px（即在屏幕上向上移 10px）
+          const box = {
+            left: x - width / 2 - padding,
+            top: y - 10 - height / 2 - padding,
+            right: x + width / 2 + padding,
+            bottom: y - 10 + height / 2 + padding,
+          }
+
+          let hasCollision = false
+          if (!elem.isImportant) {
+            for (const displayed of displayedBoxes) {
+              if (!(box.left > displayed.right ||
+                    box.right < displayed.left ||
+                    box.top > displayed.bottom ||
+                    box.bottom < displayed.top)) {
+                hasCollision = true
+                break
+              }
+            }
+          }
+
+          if (hasCollision) {
+            marker.hide()
+          } else {
+            marker.show()
+            displayedBoxes.push(box)
+          }
+        }
+      })
+    }
+
+    adjustCollisionRef.current = adjustCollision
+    adjustCollision()
+  }, [days, highlightedId, setHighlightedId, setEditingItem, isMapReady, showDetailedMarkers, showAllPlaces, allPlacesCache])
+
+  // 移动端智能偏移聚焦计算，将 Marker 推送到屏幕上半部分可用区，防止被底部抽屉遮盖
+  // 在真·双视图模式下，高亮卡片仅 108px，因此 Marker 直接在屏幕正中央聚焦展示是最美观和符合直觉的，无需进行偏移
+  const getOffsetLngLat = (lngLat: [number, number]): [number, number] => {
+    return lngLat
+  }
 
   // 单独监听 highlightedId 的变化，仅在 ID 改变时执行一次聚焦
-  const lastCenteredId = useRef<string | null>(null);
+  const lastCenteredId = useRef<string | null>(null)
   useEffect(() => {
-    if (!isMapReady || !map.current || !highlightedId) return;
-    if (lastCenteredId.current === highlightedId) return;
+    if (!isMapReady || !map.current || !highlightedId) return
+    if (lastCenteredId.current === highlightedId) return
 
-    const currentMap = map.current;
-    const places: Place[] = [];
-    const routes: Route[] = [];
+    const currentMap = map.current
+    const places: Place[] = []
+    const routes: Route[] = []
     days.forEach((day) => {
       day.items.forEach((item) => {
-        if (item.type === "place") places.push(item);
-        if (item.type === "route") routes.push(item);
-      });
-    });
+        if (item.type === "place") places.push(item)
+        if (item.type === "route") routes.push(item)
+      })
+    })
 
-    const highlightedPlace = places.find((p) => p.id === highlightedId);
+    const highlightedPlace = places.find((p) => p.id === highlightedId)
     if (highlightedPlace) {
-      currentMap.setZoomAndCenter(14, toLngLat(highlightedPlace.lngLat));
-      lastCenteredId.current = highlightedId;
+      const center = getOffsetLngLat(toLngLat(highlightedPlace.lngLat))
+      currentMap.setZoomAndCenter(14, center)
+      lastCenteredId.current = highlightedId
     } else if (showAllPlaces && allPlacesCache) {
       // 检查是否在所有地点缓存中
-      const cachedPlace = allPlacesCache.find((p) => p.id === highlightedId);
+      const cachedPlace = allPlacesCache.find((p) => p.id === highlightedId)
       if (cachedPlace) {
-        currentMap.setZoomAndCenter(14, toLngLat(cachedPlace.lngLat));
-        lastCenteredId.current = highlightedId;
+        const center = getOffsetLngLat(toLngLat(cachedPlace.lngLat))
+        currentMap.setZoomAndCenter(14, center)
+        lastCenteredId.current = highlightedId
       }
     } else {
-      const highlightedRoute = routes.find((r) => r.id === highlightedId);
+      const highlightedRoute = routes.find((r) => r.id === highlightedId)
       if (highlightedRoute && polylinesRef.current[highlightedRoute.id]) {
-        currentMap.setFitView([polylinesRef.current[highlightedRoute.id]]);
-        lastCenteredId.current = highlightedId;
+        currentMap.setFitView([polylinesRef.current[highlightedRoute.id]])
+        lastCenteredId.current = highlightedId
       }
     }
-  }, [highlightedId, isMapReady, days, showAllPlaces, allPlacesCache]);
+  }, [highlightedId, isMapReady, days, showAllPlaces, allPlacesCache])
 
   // Agent plan routes (indigo polylines for day plan preview)
   useEffect(() => {
@@ -570,28 +814,28 @@ export default function MapContainer() {
       marker.setMap(currentMap);
       markersRef.current[markerId] = marker;
     });
-  }, [agentSuggestedPlaces, isMapReady, zoom]);
+  }, [agentSuggestedPlaces, isMapReady])
 
   // 监听 agent focusPlace 事件，聚焦地图到指定位置
   useEffect(() => {
     const handleFocusPlace = (e: CustomEvent) => {
-      const { lngLat } = e.detail;
+      const { lngLat } = e.detail
       if (map.current && lngLat) {
-        map.current.setCenter(lngLat);
-        map.current.setZoom(14);
+        const center = getOffsetLngLat(lngLat)
+        map.current.setZoomAndCenter(14, center)
       }
-    };
+    }
 
     window.addEventListener(
       "agent:focusPlace",
       handleFocusPlace as EventListener
-    );
+    )
     return () =>
       window.removeEventListener(
         "agent:focusPlace",
         handleFocusPlace as EventListener
-      );
-  }, []);
+      )
+  }, [])
 
   // 监听 agent:fitPlanView 事件
   useEffect(() => {
@@ -656,15 +900,52 @@ export default function MapContainer() {
   }, [isMapReady, agentSuggestedPlaces]);
 
   return (
-    <div
-      ref={mapContainer}
-      className="w-full h-full"
-      onClick={() => {
-        const { isEditMode: currentEditMode } = useTripStore.getState();
-        if (!currentEditMode) {
-          setHighlightedId(null);
-        }
-      }}
-    />
+    <div className="relative w-full h-full">
+      <div
+        ref={mapContainer}
+        className="w-full h-full"
+        onClick={() => {
+          const { isEditMode: currentEditMode } = useTripStore.getState();
+          if (!currentEditMode) {
+            setHighlightedId(null);
+          }
+        }}
+      />
+      <div className={`absolute ${highlightedId ? 'bottom-[120px]' : 'bottom-6'} md:bottom-4 left-4 z-10 flex gap-2 transition-all duration-300`}>
+        <div className='flex gap-1 bg-white/90 backdrop-blur rounded-lg shadow-md border border-gray-200 p-0.5'>
+          {([
+            ['standard', '标准'],
+            ['amap', '高德卫星'],
+            ['tianditu', '天地图'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setMapLayer(key)}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                mapLayer === key
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className='flex gap-1 bg-white/90 backdrop-blur rounded-lg shadow-md border border-gray-200 p-0.5 animate-in fade-in slide-in-from-bottom-2 duration-300'>
+          <button
+            onClick={() => setShowDetailedMarkers(!showDetailedMarkers)}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+              showDetailedMarkers
+                ? 'bg-gray-900 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <span>📍</span>
+            <span>{showDetailedMarkers ? '详细标记' : '精简标记'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

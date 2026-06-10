@@ -121,6 +121,41 @@ TRIP_PLANNER_PROMPT = """
 - 回复时说明规划思路，并提示用户可以接受或拒绝方案"""
 
 
+IMPORT_ITINERARY_PROMPT = """
+## 导入已有行程模式
+
+用户提供了一段已有的粗略行程文本（通常包含第几天和地点名，如 "第一天： 成都-雅安-康定"）。请按以下流程执行：
+
+### 第一步：解析用户输入的行程
+1. 从用户的输入中识别出天数（例如 "第一天" 对应 dayIndex 为 1，"第二天" 对应 dayIndex 为 2）以及该天包含的地点列表（例如 ["成都", "雅安", "康定"]）。
+2. 请仔细梳理，确保不遗漏用户提到的任何一天或任何一个地点。
+
+### 第二步：获取每个地点的真实经纬度（优先查询本地）
+对于解析出来的每一个地点名：
+1. 优先调用 queryLocalPlaces 工具搜索本地数据库。如果有同名地点，直接采用其经纬度 lngLat。
+2. 如果本地数据库查不到该地点，调用高德地图 MCP 工具进行搜索或地理编码（例如调用 maps_text_search 或 maps_geo 工具），获取其真实的经纬度。
+3. 严禁编造任何地点的经纬度。
+
+### 第三步：调用 importDayRoute 保存行程（必须）
+对识别出的每一天，调用 importDayRoute 工具将行程保存到数据库中。
+参数说明：
+- trip_id: 当前正在编辑的行程 ID（可从上下文 "当前正在编辑的行程" 获取，必须传入）
+- day_index: 识别出的天数索引（整数，如 1）
+- places: 该天包含 of 地点列表，每个地点必须包含 name 和真实的 lngLat
+- description: 这一天的简短描述，例如 "成都-雅安-康定"
+
+如果用户输入了多天的行程，请按天数顺序，针对每一天依次调用 importDayRoute 工具，直到全部保存完毕。
+
+### 第四步：文字回复
+用文字向用户确认哪些天和哪些地点的行程已经成功导入，并对导入的结果或路线做一个简单的说明。
+
+重要约束：
+- 必须使用当前正在编辑的行程 ID（current_trip_id）。如果当前没有正在编辑的行程，告知用户请先选择或创建一个行程。
+- 对每个地点，必须通过本地数据库或高德地图 MCP 工具获取真实的经纬度坐标，绝对不可自行编造坐标。
+- 必须调用 importDayRoute 将结果保存到数据库中，不可漏掉任何一天。
+"""
+
+
 MEMORY_PROMPT = """
 ## 记忆模式
 
@@ -141,6 +176,7 @@ class PromptBuilder:
         "place_search": PLACE_SEARCH_PROMPT,
         "trip_planner": TRIP_PLANNER_PROMPT,
         "memory": MEMORY_PROMPT,
+        "import_itinerary": IMPORT_ITINERARY_PROMPT,
     }
 
     def __init__(self, db_session: AsyncSession):

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Star, Ticket, Plus, Check, MapPin, ChevronRight } from 'lucide-react'
+import { Star, Plus, Check, MapPin } from 'lucide-react'
 import { useState } from 'react'
 import { useTripStore } from '../store'
 

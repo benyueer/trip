@@ -19,7 +19,23 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useDroppable } from '@dnd-kit/core'
 import { useTripStore, type TripItem, type Place, type CachedPlace } from '../store'
-import { Plus, Trash2, MapPin, Navigation, GripVertical, Star } from 'lucide-react'
+import { Plus, Trash2, MapPin, Navigation, GripVertical, Star, Car, Bike, Footprints, Pencil, X } from 'lucide-react'
+
+// ---- 单个可拖拽卡片 ----
+// 根据路线名称匹配交通工具图标
+const getRouteIcon = (name: string) => {
+  const lower = name.toLowerCase()
+  if (lower.includes('驾车') || lower.includes('driving') || lower.includes('car')) {
+    return <Car size={12} />
+  }
+  if (lower.includes('骑行') || lower.includes('riding') || lower.includes('bike') || lower.includes('cycling')) {
+    return <Bike size={12} />
+  }
+  if (lower.includes('步行') || lower.includes('walking') || lower.includes('walk')) {
+    return <Footprints size={12} />
+  }
+  return <Navigation size={12} className='transform rotate-45' />
+}
 
 // ---- 单个可拖拽卡片 ----
 function SortableItemCard({
@@ -50,17 +66,24 @@ function SortableItemCard({
     opacity: isDragging ? 0.35 : 1,
   }
 
+  const isPlace = item.type === 'place'
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       onClick={onHighlight}
-      className={`
-        group relative rounded-2xl cursor-pointer transition-all duration-300 border flex items-stretch
-        ${isHighlight
-          ? 'bg-blue-50/80 border-blue-200 shadow-lg ring-1 ring-blue-500/20'
-          : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-md hover:bg-gray-50/50'}
-      `}
+      className={
+        isPlace
+          ? `group relative rounded-2xl cursor-pointer transition-all duration-300 border flex items-stretch
+             ${isHighlight
+               ? 'bg-blue-50/80 border-blue-200 shadow-lg ring-1 ring-blue-500/20'
+               : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-md hover:bg-gray-50/50'}`
+          : `group relative rounded-xl cursor-pointer transition-all duration-300 flex items-stretch -my-1
+             ${isHighlight
+               ? 'bg-blue-50/30 border border-dashed border-blue-200/60 shadow-sm'
+               : 'bg-transparent border border-transparent hover:bg-gray-50/30'}`
+      }
     >
       {/* 拖拽手柄（编辑模式才显示） */}
       {isEditMode && (
@@ -74,8 +97,8 @@ function SortableItemCard({
         </div>
       )}
 
-      <div className='p-4 flex-1 min-w-0'>
-        {item.type === 'place' ? (
+      <div className={isPlace ? 'p-4 flex-1 min-w-0' : 'px-4 py-1.5 flex-1 min-w-0'}>
+        {isPlace ? (
           <div className='flex items-start gap-3'>
             <div
               className='flex items-center justify-center w-10 h-10 rounded-2xl text-base font-bold transition-all shadow-sm shrink-0'
@@ -119,16 +142,28 @@ function SortableItemCard({
             </div>
           </div>
         ) : (
-          <div className='flex items-center gap-3'>
-            <div
-              className='flex items-center justify-center w-10 h-10 rounded-2xl text-base font-bold transition-all shadow-sm shrink-0'
-              style={{ background: isHighlight ? dayColor.text : dayColor.bg, color: isHighlight ? '#fff' : dayColor.text }}
-            >
-              <Navigation size={18} />
+          <div className='flex items-stretch gap-3 min-h-[40px] relative'>
+            {/* 左侧垂直线与小节点 */}
+            <div className='flex flex-col items-center w-10 shrink-0 relative justify-center'>
+              {/* 垂直连线 */}
+              <div className='absolute -top-3 -bottom-3 left-1/2 -translate-x-1/2 border-l-2 border-dashed border-gray-200 group-hover:border-blue-300 transition-colors' />
+              
+              {/* 中间的小节点 */}
+              <div
+                className={`z-10 flex items-center justify-center w-6 h-6 rounded-full text-white transition-all shadow-sm shrink-0
+                  ${isHighlight ? '' : 'bg-gray-400 group-hover:bg-blue-500'}`}
+                style={isHighlight ? { background: dayColor.text } : {}}
+              >
+                {getRouteIcon(item.name)}
+              </div>
             </div>
-            <div className='flex flex-col min-w-0'>
-              <span className={`font-bold text-sm ${isHighlight ? 'text-indigo-900' : 'text-gray-800'} truncate`}>{item.name}</span>
-              <span className='text-[10px] text-gray-400 mt-0.5 font-medium uppercase tracking-wider'>
+
+            {/* 右侧路线信息 */}
+            <div className='flex flex-col min-w-0 flex-1 justify-center'>
+              <span className={`font-bold text-xs ${isHighlight ? 'text-blue-900' : 'text-gray-500'} truncate`}>
+                {item.name}
+              </span>
+              <span className='text-[10px] text-gray-400 mt-0.5 font-medium'>
                 路线：{(item as any).distance}{(item as any).duration ? ` · ${(item as any).duration}` : ''}
               </span>
             </div>
@@ -140,7 +175,7 @@ function SortableItemCard({
       {isEditMode && (
         <button
           onClick={e => { e.stopPropagation(); onDelete() }}
-          className='absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all'
+          className='absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all z-20'
           title='删除'
         >
           <Trash2 size={16} />
@@ -186,6 +221,7 @@ function DroppableDayTab({
   onActivate,
   onDelete,
   isDragging,
+  isGuest,
 }: {
   dayIndex: number
   isActive: boolean
@@ -193,6 +229,7 @@ function DroppableDayTab({
   onActivate: () => void
   onDelete: () => void
   isDragging: boolean
+  isGuest: boolean
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `day-tab-${dayIndex}` })
   const color = getDayColor(dayIndex)
@@ -211,7 +248,7 @@ function DroppableDayTab({
           : {}}
     >
       Day {dayIndex}
-      {isActive && canDelete && (
+      {isActive && canDelete && !isGuest && (
         <button
           onClick={e => { e.stopPropagation(); onDelete() }}
           className='p-0.5 hover:bg-red-50 hover:text-red-500 rounded-md transition-colors'
@@ -224,8 +261,15 @@ function DroppableDayTab({
 }
 
 // ---- 主面板 ----
-export default function FloatingPanel() {
+export default function FloatingPanel({
+  mobileView,
+  setMobileView,
+}: {
+  mobileView?: 'map' | 'list'
+  setMobileView?: (view: 'map' | 'list') => void
+}) {
   const currentTrip = useTripStore(state => state.currentTrip)
+  const isGuest = useTripStore(state => state.isGuest)
   const days = currentTrip?.days || []
   const highlightedId = useTripStore(state => state.highlightedId)
   const {
@@ -251,12 +295,33 @@ export default function FloatingPanel() {
     fetchAllPlaces,
     setShowAllPlaces,
     updateCurrentTrip,
+    setEditingItem,
+    setRoutingStart,
   } = useTripStore()
 
   const [activeItem, setActiveItem] = useState<TripItem | null>(null)
   const [editingDayDesc, setEditingDayDesc] = useState(false)
   const [dayDescValue, setDayDescValue] = useState('')
   const dayDescInputRef = useRef<HTMLTextAreaElement>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // 移动端自适应检测
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // 当高亮条目变化时，桌面端自动展开面板，移动端不强制弹出大抽屉
+  useEffect(() => {
+    if (highlightedId) {
+      if (!isMobile) {
+        setIsExpanded(true)
+      }
+    }
+  }, [highlightedId, isMobile])
 
   const startEditDayDesc = () => {
     setDayDescValue(activeDay?.description || '')
@@ -292,7 +357,21 @@ export default function FloatingPanel() {
     setEditingDayDesc(false)
   }, [activeDayIndex])
 
+  // 游客模式强制退出编辑模式
+  useEffect(() => {
+    if (isGuest) {
+      setIsEditMode(false)
+    }
+  }, [isGuest, setIsEditMode])
+
   const allPlaces = days.flatMap(d => d.items).filter(i => i.type === 'place') as Place[]
+  
+  // 查找高亮地点的详细信息，支持缓存中的地点
+  const highlightedPlace = highlightedId
+    ? (days.flatMap(d => d.items).find(i => i.id === highlightedId && i.type === 'place') as Place | undefined) ||
+      allPlacesCache?.find(p => p.id === highlightedId)
+    : undefined
+
   const activeDay = days.find(d => d.dayIndex === activeDayIndex)
   const isDragging = activeItem !== null
 
@@ -350,6 +429,13 @@ export default function FloatingPanel() {
     }
   }
 
+  const mobileHeightClass = () => {
+    if (!isMobile) return 'md:h-auto'
+    if (mobileView === 'list') return 'h-[calc(100dvh-64px)] w-full rounded-none border-t-0'
+    // mobileView === 'map'
+    return highlightedPlace ? 'h-[108px] w-full rounded-t-3xl border-t border-gray-200/80 shadow-lg' : 'h-0 border-t-0 overflow-hidden'
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -357,23 +443,115 @@ export default function FloatingPanel() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className='absolute right-4 top-4 bottom-4 w-96 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/40 overflow-hidden flex flex-col z-10 transition-all duration-300'>
-        {/* 头部 */}
-        <div className='p-5 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl z-20 flex justify-between items-start'>
-          <div className='flex-1 min-w-0'>
-            <h1 className='text-2xl font-black bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent'>行程详情</h1>
-            <div className='flex items-center gap-2 mt-1'>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isEditMode ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
-                {isEditMode ? '编辑模式' : '查看模式'}
-              </span>
-              <button
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`w-8 h-4 rounded-full relative transition-colors ${isEditMode ? 'bg-orange-500' : 'bg-gray-300'}`}
-              >
-                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isEditMode ? 'left-4.5' : 'left-0.5'}`} />
-              </button>
+      <div className={`fixed md:absolute bottom-0 left-0 right-0 md:left-auto md:right-4 md:top-4 md:bottom-4 w-full md:w-96 bg-white/95 md:bg-white/90 backdrop-blur-md rounded-t-3xl rounded-b-none md:rounded-2xl shadow-2xl border border-t border-gray-200/60 md:border-white/40 overflow-hidden flex flex-col z-30 transition-all duration-300 ${isMobile ? mobileHeightClass() : (isExpanded ? 'h-[75vh] md:h-auto' : 'h-[150px] md:h-auto')}`}>
+        {/* 移动端地图视图且高亮时，直接渲染高亮快捷卡片，完全不显示 Header/Day tabs/列表 */}
+        {isMobile && mobileView === 'map' ? (
+          highlightedPlace ? (
+            <div className='p-4 flex-1 flex flex-col justify-between overflow-hidden bg-white/50 backdrop-blur-md select-none animate-in fade-in slide-in-from-bottom-2 duration-300'>
+              <div className='flex items-start gap-3 relative'>
+                <div
+                  className='flex items-center justify-center w-10 h-10 rounded-2xl text-base font-bold transition-all shadow-sm shrink-0 bg-blue-100 text-blue-600'
+                >
+                  <MapPin size={18} />
+                </div>
+                <div className='flex flex-col min-w-0 flex-1 pr-6'>
+                  <div className='flex items-center gap-2'>
+                    <span className='font-bold text-sm text-gray-900 truncate'>{highlightedPlace.name}</span>
+                    {highlightedPlace.rating && (
+                      <span className='flex items-center gap-0.5 text-[10px] font-bold text-amber-500 shrink-0'>
+                        <Star size={10} fill="currentColor" /> {highlightedPlace.rating}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className='flex items-center gap-1.5 mt-0.5'>
+                    {highlightedPlace.category && (
+                      <span className='text-[8px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-gray-100 text-gray-500'>
+                        {highlightedPlace.category}
+                      </span>
+                    )}
+                    {highlightedPlace.ticket && (
+                      <span className='text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700'>
+                        ¥{highlightedPlace.ticket}
+                      </span>
+                    )}
+                    {highlightedPlace.address && (
+                      <span className='text-[9px] text-gray-400 truncate flex-1'>{highlightedPlace.address}</span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setHighlightedId(null)}
+                  className='absolute right-0 top-0 p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors cursor-pointer'
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className='flex items-center gap-2 mt-2 pt-2 border-t border-gray-100/60 shrink-0'>
+                {allPlacesCache?.some(p => p.id === highlightedPlace.id) && !days.some(d => d.items.some(i => i.id === highlightedPlace.id)) ? (
+                  <button
+                    onClick={() => {
+                      useTripStore.getState().addSuggestedPlaceToTrip(highlightedPlace as any, activeDayIndex)
+                      setMobileView?.('list') // 添加后跳转列表视图
+                    }}
+                    className='flex-1 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-sm hover:bg-blue-700 transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer'
+                  >
+                    <Plus size={12} /> 加入行程 (Day {activeDayIndex})
+                  </button>
+                ) : (
+                  <>
+                    {!isGuest && isEditMode && (
+                      <button
+                        onClick={() => {
+                          setEditingItem({
+                            type: 'edit',
+                            dayIndex: days.find(d => d.items.some(i => i.id === highlightedPlace.id))?.dayIndex || activeDayIndex,
+                            item: highlightedPlace,
+                          })
+                        }}
+                        className='flex-1 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer'
+                      >
+                        <Pencil size={12} /> 编辑详情
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        startRouting()
+                        setRoutingStart(highlightedPlace as Place)
+                        setMobileView?.('list') // 去列表视图做后续规划
+                      }}
+                      className='flex-1 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer'
+                    >
+                      <Navigation size={12} className='transform rotate-45' /> 以此规划路线
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            {isEditMode && (
+          ) : null
+        ) : (
+          <>
+
+        {/* 头部 */}
+        <div className='p-3 sm:p-5 border-b border-gray-100/50 bg-white/80 backdrop-blur-xl z-20 flex justify-between items-start shrink-0'>
+          <div className='flex-1 min-w-0'>
+            <h1 className='text-xl sm:text-2xl font-black bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent'>行程详情</h1>
+            {!isGuest && (
+              <div className='flex items-center gap-2 mt-1'>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isEditMode ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
+                  {isEditMode ? '编辑模式' : '查看模式'}
+                </span>
+                <button
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={`w-8 h-4 rounded-full relative transition-colors ${isEditMode ? 'bg-orange-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isEditMode ? 'left-4.5' : 'left-0.5'}`} />
+                </button>
+              </div>
+            )}
+            {!isGuest && isEditMode && (
               <div className='flex items-center gap-2 mt-2'>
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${showAllPlaces ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}>
                   所有地点
@@ -393,17 +571,19 @@ export default function FloatingPanel() {
               <p className='text-xs text-gray-400 mt-2 line-clamp-2'>{currentTrip.description}</p>
             )}
           </div>
-          <button
-            onClick={() => addDay()}
-            className='p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all active:scale-95 shadow-sm border border-blue-100'
-            title='添加天数'
-          >
-            <Plus size={20} />
-          </button>
+          {!isGuest && (
+            <button
+              onClick={() => addDay()}
+              className='p-1.5 sm:p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all active:scale-95 shadow-sm border border-blue-100 cursor-pointer'
+              title='添加天数'
+            >
+              <Plus size={18} />
+            </button>
+          )}
         </div>
 
         {/* Day Tab 栏（也是拖拽放置区） */}
-        <div className='px-4 py-3 bg-gray-50/50 border-b border-gray-100/50 overflow-x-auto no-scrollbar'>
+        <div className='px-4 py-2 sm:py-3 bg-gray-50/50 border-b border-gray-100/50 overflow-x-auto no-scrollbar shrink-0'>
           <div className='flex gap-2'>
             {days.map(day => (
               <DroppableDayTab
@@ -412,12 +592,13 @@ export default function FloatingPanel() {
                 isActive={activeDayIndex === day.dayIndex}
                 canDelete={days.length > 1}
                 isDragging={isDragging}
+                isGuest={isGuest}
                 onActivate={() => setActiveDayIndex(day.dayIndex)}
                 onDelete={() => { if (confirm(`确定要删除第 ${day.dayIndex} 天吗？`)) deleteDay(day.dayIndex) }}
               />
             ))}
           </div>
-          {editingDayDesc ? (
+          {editingDayDesc && !isGuest ? (
             <div className='mt-1.5 px-1'>
               <textarea
                 ref={dayDescInputRef}
@@ -436,11 +617,11 @@ export default function FloatingPanel() {
             </div>
           ) : (
             <p
-              onClick={startEditDayDesc}
-              className='text-xs text-gray-400 mt-1.5 px-1 cursor-text hover:text-gray-600 transition-colors'
-              title='点击编辑描述'
+              onClick={!isGuest ? startEditDayDesc : undefined}
+              className={`text-xs text-gray-400 mt-1.5 px-1 ${!isGuest ? 'cursor-text hover:text-gray-600' : ''} transition-colors`}
+              title={!isGuest ? '点击编辑描述' : undefined}
             >
-              {activeDay?.description || (isEditMode ? '点击添加当天描述...' : '')}
+              {activeDay?.description || (isEditMode && !isGuest ? '点击添加当天描述...' : '')}
             </p>
           )}
         </div>
@@ -541,7 +722,12 @@ export default function FloatingPanel() {
                     isEditMode={isEditMode}
                     activeDayIndex={activeDayIndex}
                     dayColor={getDayColor(activeDayIndex)}
-                    onHighlight={() => setHighlightedId(item.id)}
+                    onHighlight={() => {
+                      setHighlightedId(item.id)
+                      if (isMobile) {
+                        setMobileView?.('map')
+                      }
+                    }}
                     onDelete={() => {
                       if (confirm(`确定要删除 ${item.name} 吗？`)) deleteItem(activeDayIndex, item.id)
                     }}
@@ -559,7 +745,12 @@ export default function FloatingPanel() {
                       return (
                         <div
                           key={place.id}
-                          onClick={() => setHighlightedId(place.id)}
+                          onClick={() => {
+                            setHighlightedId(place.id)
+                            if (isMobile) {
+                              setMobileView?.('map')
+                            }
+                          }}
                           className={`
                             group relative rounded-2xl cursor-pointer transition-all duration-300 border flex items-stretch
                             ${highlightedId === place.id
@@ -609,6 +800,8 @@ export default function FloatingPanel() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* 拖拽时跟随鼠标的幽灵卡片 */}

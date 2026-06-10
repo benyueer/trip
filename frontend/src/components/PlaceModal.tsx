@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTripStore } from '../store'
+
+const genId = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 import { X, MapPin, Check, Trash2, Phone, Clock, Star, Tag, FileText } from 'lucide-react'
 
 export default function PlaceModal() {
@@ -46,7 +48,7 @@ export default function PlaceModal() {
 
     if (editingItem.type === 'add' && editingItem.lngLat) {
       addPlace(editingItem.dayIndex, {
-        id: crypto.randomUUID(),
+        id: genId(),
         type: 'place',
         name: name.trim(),
         description: description.trim(),
@@ -97,10 +99,10 @@ export default function PlaceModal() {
   return (
     <div className='fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4' onClick={() => setEditingItem(null)}>
       <div 
-        className='bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200'
+        className='bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]'
         onClick={(e) => e.stopPropagation()}
       >
-        <div className='p-6 pb-0 flex justify-between items-start'>
+        <div className='p-6 pb-0 flex justify-between items-start shrink-0'>
           <div className='bg-blue-50 p-3 rounded-2xl'>
             <MapPin className='text-blue-600' size={24} />
           </div>
@@ -108,7 +110,7 @@ export default function PlaceModal() {
             {editingItem.type === 'edit' && (
               <button 
                 onClick={handleDelete}
-                className='p-2 hover:bg-red-50 rounded-full transition-colors text-red-400 hover:text-red-600'
+                className='p-2 hover:bg-red-50 rounded-full transition-colors text-red-400 hover:text-red-600 cursor-pointer'
                 title='删除地点'
               >
                 <Trash2 size={20} />
@@ -116,14 +118,14 @@ export default function PlaceModal() {
             )}
             <button 
               onClick={() => setEditingItem(null)}
-              className='p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400'
+              className='p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 cursor-pointer'
             >
               <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className='p-6'>
+        <div className='p-6 overflow-y-auto flex-1'>
           <h2 className='text-xl font-bold text-gray-900 mb-1'>
             {editingItem.type === 'add' ? '新增地点' : '修改详情'}
           </h2>

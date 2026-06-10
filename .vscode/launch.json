@@ -9,7 +9,7 @@
       "cwd": "${workspaceFolder}/backend-py",
       "envFile": "${workspaceFolder}/backend-py/.env",
       "justMyCode": true,
-      "args": []
+      "args": ["--host", "0.0.0.0"]
     }
   ]
 }

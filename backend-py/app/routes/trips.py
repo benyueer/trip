@@ -194,6 +194,8 @@ async def create_trip(
     request: Request,
     db_session: AsyncSession,
 ) -> dict:
+    if request.user.get("provider") == "guest":
+        raise HTTPException(status_code=403, detail="游客模式只读，无法进行此操作")
     user_id = request.user["id"]
 
     trip = Trip(
@@ -257,6 +259,8 @@ async def update_trip(
     request: Request,
     db_session: AsyncSession,
 ) -> dict:
+    if request.user.get("provider") == "guest":
+        raise HTTPException(status_code=403, detail="游客模式只读，无法进行此操作")
     user_id = request.user["id"]
 
     result = await db_session.execute(select(Trip).where(Trip.id == trip_id))
@@ -331,6 +335,8 @@ async def delete_trip(
     request: Request,
     db_session: AsyncSession,
 ) -> None:
+    if request.user.get("provider") == "guest":
+        raise HTTPException(status_code=403, detail="游客模式只读，无法进行此操作")
     user_id = request.user["id"]
 
     result = await db_session.execute(select(Trip).where(Trip.id == trip_id))
@@ -351,6 +357,8 @@ async def calculate_and_add_route(
     request: Request,
     db_session: AsyncSession,
 ) -> dict:
+    if request.user.get("provider") == "guest":
+        raise HTTPException(status_code=403, detail="游客模式只读，无法进行此操作")
     start_lng_lat = data.get("startLngLat")
     end_lng_lat = data.get("endLngLat")
     mode = data.get("mode")

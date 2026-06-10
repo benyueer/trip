@@ -14,16 +14,15 @@ from app.agent.routes import (
     get_agent_memories,
     get_agent_messages,
     get_agent_sessions,
+    update_agent_session,
 )
 from app.jwt_auth import jwt_auth
 from app.routes.auth import (
-    auth_dev_login,
-    auth_github,
-    auth_github_callback,
-    auth_google,
-    auth_google_callback,
-    auth_logout,
     auth_me,
+    auth_logout,
+    auth_register,
+    auth_login,
+    auth_guest_login,
 )
 from app.routes.mcp import mcp_message, mcp_sse
 from app.routes.shares import create_share, delete_share, list_shares
@@ -52,7 +51,14 @@ async def on_shutdown() -> None:
 
 
 cors_config = CORSConfig(
-    allow_origins=[settings.client_url],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3001",
+        "http://0.0.0.0:5173",
+        "http://0.0.0.0:3001",
+        "http://192.168.8.48:5173",
+        "http://192.168.8.48:3001",
+    ],
     allow_credentials=True,
 )
 
@@ -61,13 +67,11 @@ def create_app() -> Litestar:
     return Litestar(
         cors_config=cors_config,
         route_handlers=[
-            auth_dev_login,
             auth_me,
             auth_logout,
-            auth_google,
-            auth_google_callback,
-            auth_github,
-            auth_github_callback,
+            auth_register,
+            auth_login,
+            auth_guest_login,
             get_all_trips,
             get_all_places,
             get_trip_by_id,
@@ -81,6 +85,7 @@ def create_app() -> Litestar:
             search_users,
             get_agent_sessions,
             create_agent_session,
+            update_agent_session,
             delete_agent_session,
             get_agent_messages,
             agent_chat,
