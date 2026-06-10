@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",
-    "dev:backend": "cd backend-py && .venv/bin/uvicorn app.main:create_app --factory --reload --port 3001",
+    "dev:backend": "cd backend-py && .venv/bin/uvicorn app.main:create_app --factory --reload --port 4433",
     "dev:all": "pnpm dev:frontend & pnpm dev:backend",
     "install:all": "pnpm install"
   }
