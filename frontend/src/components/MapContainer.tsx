@@ -361,25 +361,28 @@ export default function MapContainer() {
         },
       })
 
-      marker.on("click", () => {
+      marker.on('click', () => {
         const { isEditMode: currentEditMode, isRouting } =
-          useTripStore.getState();
+          useTripStore.getState()
 
         // 规划路线时地图上的点不再响应点击进行选点
-        if (isRouting) return;
+        if (isRouting) return
+
+        const targetDayIndex = marker.getExtData().dayIndex || 1
+        useTripStore.getState().setActiveDayIndex(targetDayIndex)
 
         if (currentEditMode) {
           // 编辑模式：弹出编辑框
           setEditingItem({
-            type: "edit",
-            dayIndex: marker.getExtData().dayIndex || 1,
+            type: 'edit',
+            dayIndex: targetDayIndex,
             item: place,
-          });
+          })
         } else {
           // 查看模式：高亮与缩放
-          setHighlightedId(place.id);
+          setHighlightedId(place.id)
         }
-      });
+      })
 
       marker.setMap(currentMap);
       markersRef.current[place.id] = marker;
@@ -451,6 +454,7 @@ export default function MapContainer() {
 
       polyline.on('click', () => {
         const { isEditMode: currentEditMode } = useTripStore.getState()
+        useTripStore.getState().setActiveDayIndex(routeDayIndex)
         if (!currentEditMode) {
           setHighlightedId(route.id)
         }
@@ -493,6 +497,7 @@ export default function MapContainer() {
 
         routeMarker.on('click', () => {
           const { isEditMode: currentEditMode } = useTripStore.getState()
+          useTripStore.getState().setActiveDayIndex(routeDayIndex)
           if (!currentEditMode) {
             setHighlightedId(route.id)
           }
