@@ -183,9 +183,9 @@ export interface TripState {
   setIsEditMode: (isEditMode: boolean) => void
   setEditingItem: (item: EditingItem | null) => void
 
-  addPlace: (dayIndex: number, place: Place) => void
+  addPlace: (dayIndex: number, place: Place) => Promise<void>
   updatePlace: (dayIndex: number, placeId: string, data: Partial<Place>) => void
-  deleteItem: (dayIndex: number, itemId: string) => void
+  deleteItem: (dayIndex: number, itemId: string) => Promise<void>
   addRoute: (dayIndex: number, route: Route) => void
   calculateAndAddRoute: (dayIndex: number, startPlace: Place, endPlace: Place, mode: string) => Promise<void>
   reorderItems: (dayIndex: number, newItems: TripItem[]) => Promise<void>
@@ -231,7 +231,7 @@ export interface TripState {
   sendAgentMessage: (content: string, currentTripId?: string, intent?: string) => Promise<void>
   setAgentPanelOpen: (open: boolean) => void
   clearSuggestedPlaces: () => void
-  addSuggestedPlaceToTrip: (place: { name: string; lngLat: [number, number]; description?: string; category?: string; address?: string; rating?: string; ticket?: string; openingHours?: string; phone?: string; notes?: string }, dayIndex?: number) => void
+  addSuggestedPlaceToTrip: (place: { name: string; lngLat: [number, number]; description?: string; category?: string; address?: string; rating?: string; ticket?: string; openingHours?: string; phone?: string; notes?: string }, dayIndex?: number) => Promise<void>
   setAgentPlanRoutes: (routes: Array<{ distance: string; duration: string; path: [number, number][] }> | null) => void
 }
 
@@ -316,7 +316,7 @@ export const useTripStore = create<TripState>((set, get) => ({
 
   setEditingItem: (editingItem) => set({ editingItem }),
 
-  addPlace: (dayIndex, place) => {
+  addPlace: async (dayIndex, place) => {
     const { currentTrip } = get()
     if (!currentTrip) return
 
@@ -328,7 +328,8 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
     day.items.push(place)
 
-    get().updateCurrentTrip({ days: newDays })
+    await get().updateCurrentTrip({ days: newDays })
+    await get().autoRecalculateRoutes(dayIndex)
   },
 
   updatePlace: (dayIndex, placeId, data) => {
@@ -351,21 +352,32 @@ export const useTripStore = create<TripState>((set, get) => ({
     get().updateCurrentTrip({ days: newDays })
   },
 
-  deleteItem: (dayIndex, itemId) => {
+  deleteItem: async (dayIndex, itemId) => {
     const { currentTrip } = get()
     if (!currentTrip) return
 
-    const newDays = currentTrip.days.map(day => {
-      if (day.dayIndex === dayIndex) {
+    const day = currentTrip.days.find(d => d.dayIndex === dayIndex)
+    const itemToDelete = day?.items.find(i => i.id === itemId)
+    const isPlace = itemToDelete?.type === 'place'
+
+    const newDays = currentTrip.days.map(d => {
+      if (d.dayIndex === dayIndex) {
         return {
-          ...day,
-          items: day.items.filter(item => item.id !== itemId)
+          ...d,
+          // 如果删除的是地点，把同天里的所有路线也去掉，之后会通过 autoRecalculateRoutes 重新规划
+          // 如果删除的是路线本身，则只过滤该路线，不重新算其它路线
+          items: d.items.filter(item => 
+            item.id !== itemId && !(isPlace && item.type === 'route')
+          )
         }
       }
-      return day
+      return d
     })
 
-    get().updateCurrentTrip({ days: newDays })
+    await get().updateCurrentTrip({ days: newDays })
+    if (isPlace) {
+      await get().autoRecalculateRoutes(dayIndex)
+    }
   },
 
   calculateAndAddRoute: async (dayIndex: number, startPlace: Place, endPlace: Place, mode: string) => {
@@ -869,7 +881,7 @@ export const useTripStore = create<TripState>((set, get) => ({
   clearSuggestedPlaces: () => set({ agentSuggestedPlaces: null }),
   setAgentPlanRoutes: (routes) => set({ agentPlanRoutes: routes }),
 
-  addSuggestedPlaceToTrip: (place, dayIndex) => {
+  addSuggestedPlaceToTrip: async (place, dayIndex) => {
     const { currentTrip, activeDayIndex } = get()
     if (!currentTrip) {
       alert('请先打开一个行程')
@@ -899,6 +911,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       notes: place.notes || '',
     })
 
-    get().updateCurrentTrip({ days: newDays })
+    await get().updateCurrentTrip({ days: newDays })
+    await get().autoRecalculateRoutes(targetDay)
   },
 }))
